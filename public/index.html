@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuantuMania — Complete AI Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="intros.css" />
+  <link rel="stylesheet" href="launch-screen.css" />
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+
+  <!-- API client (sets up window.claude.complete + window.ariaChat) -->
+  <script src="api-client.js"></script>
+
+  <!-- Design system components (order matters!) -->
+  <script type="text/babel" src="icons.jsx"></script>
+  <script type="text/babel" src="components.jsx"></script>
+
+  <!-- Page components -->
+  <script type="text/babel" src="page-overview.jsx"></script>
+  <script type="text/babel" src="page-calls.jsx"></script>
+  <script type="text/babel" src="page-email.jsx"></script>
+  <script type="text/babel" src="page-posts.jsx"></script>
+  <script type="text/babel" src="page-interview.jsx"></script>
+  <script type="text/babel" src="page-ats.jsx"></script>
+  <script type="text/babel" src="page-attendance.jsx"></script>
+  <script type="text/babel" src="page-analytics.jsx"></script>
+  <script type="text/babel" src="page-settings.jsx"></script>
+  <script type="text/babel" src="page-chat.jsx"></script>
+  <script type="text/babel" src="launch-screen.jsx"></script>
+  <script type="text/babel" src="page-intros.jsx"></script>
+
+  <!-- Main app shell -->
+  <script type="text/babel" data-presets="env,react">
+    const { useState, useEffect } = React;
+
+    const PAGE_META = {
+      chat:       { title: "Chat with Aria",         sub: "Your AI co-worker" },
+      overview:   { title: "Overview",               sub: "Operations dashboard" },
+      calls:      { title: "Calls Automation",       sub: "Inbound AI voice agent" },
+      email:      { title: "Email Automation",       sub: "Inbox & AI replies" },
+      posts:      { title: "Posts & Socials",        sub: "LinkedIn / X automation" },
+      ats:        { title: "Resumes & ATS",          sub: "AI ranks every CV" },
+      interview:  { title: "AI Interview Assistant", sub: "Live screening · anti-cheat" },
+      attendance: { title: "Attendance & Leave",     sub: "Face check-in · geo-fence" },
+      analytics:  { title: "HR Analytics",           sub: "Dashboards & reports" },
+      settings:   { title: "Settings",               sub: "Model · languages · Supabase" },
+    };
+
+    function App() {
+      const [booted, setBooted]   = useState(false);
+      const [page, setPage]       = useState("chat");
+      const [theme, setTheme]     = useState("default");
+      const [navKey, setNavKey]   = useState(0);
+
+      useEffect(() => {
+        if (theme === "default") document.documentElement.removeAttribute("data-theme");
+        else document.documentElement.setAttribute("data-theme", theme);
+      }, [theme]);
+
+      function navigate(p) {
+        if (p === page) return;
+        setPage(p);
+        setNavKey(k => k + 1);
+      }
+
+      const meta = PAGE_META[page] || { title: "", sub: "" };
+
+      if (!booted) {
+        return <LaunchScreen onEnter={() => setBooted(true)} />;
+      }
+
+      return (
+        <div className="app-root" style={{ display: "flex", flexDirection: "row" }}>
+          <Sidebar current={page} onNavigate={navigate} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+            <TopBar title={meta.title} subtitle={meta.sub} theme={theme} setTheme={setTheme} />
+            <main key={navKey} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
+
+              {/* Per-feature intro animation */}
+              <PageIntro kind={page} label={meta.title} sublabel={meta.sub} k={navKey} />
+
+              {/* Ambient background motif */}
+              <div className={`ambient-${page}`} />
+
+              <div className="page-reveal" style={{ position: "relative", zIndex: 1 }}>
+                {page === "chat"       && <ChatPage />}
+                {page === "overview"   && <OverviewPage navigate={navigate} />}
+                {page === "calls"      && <CallsPage />}
+                {page === "email"      && <EmailPage />}
+                {page === "posts"      && <PostsPage />}
+                {page === "interview"  && <InterviewPage />}
+                {page === "ats"        && <ATSPage />}
+                {page === "attendance" && <AttendancePage />}
+                {page === "analytics"  && <AnalyticsPage />}
+                {page === "settings"   && <SettingsPage />}
+              </div>
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

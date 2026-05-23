@@ -1,0 +1,653 @@
+/* ───────────────────────────────────────────
+   Per-page intro animations + ambient effects
+   ─────────────────────────────────────────── */
+
+/* Intro shell — full-page overlay that fades out */
+.page-intro-shell {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background:
+    radial-gradient(ellipse at center, rgba(var(--accent), 0.10) 0%, transparent 60%),
+    rgba(6, 6, 10, 0.92);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  animation: page-intro-shell-out 1.6s ease-out forwards;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.page-intro-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.intro-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
+}
+
+@keyframes page-intro-shell-out {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+/* Label / sublabel */
+.page-intro-text {
+  position: absolute;
+  bottom: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  animation: intro-fade 1.2s 0.2s both;
+}
+.page-intro-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: rgb(var(--accent-3));
+  margin-bottom: 8px;
+  text-shadow: 0 0 12px rgba(var(--accent), 0.4);
+}
+.page-intro-sub {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--fg-1);
+  animation: intro-rise 0.8s 0.3s both;
+}
+
+/* ── Shared keyframes ─────────────────────── */
+@keyframes intro-fade   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes intro-rise   { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes intro-pop    { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+@keyframes intro-dash   { to { stroke-dashoffset: 0; } }
+@keyframes intro-line   { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@keyframes intro-ring {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  20%  { opacity: 0.8; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+}
+
+/* ── Chat ─────────────────────────────────── */
+.intro-chat-greeting {
+  position: absolute;
+  left: 50%; top: calc(50% + 160px);
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 18px;
+  background: rgba(var(--accent), 0.12);
+  border: 1px solid rgba(var(--accent), 0.4);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  color: rgb(var(--accent-3));
+  animation: intro-pop 0.5s 0.6s ease-out both;
+  box-shadow: 0 0 24px rgba(var(--accent), 0.4);
+}
+
+/* Ambient for chat — soft breathing glow */
+.ambient-chat::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(var(--accent), 0.06), transparent 50%);
+  animation: ambient-breathe 6s ease-in-out infinite;
+}
+
+/* ── Overview ─────────────────────────────── */
+.intro-grid-flash {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(var(--accent), 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--accent), 0.18) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: intro-grid-flash 1.6s ease-out forwards;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+}
+@keyframes intro-grid-flash {
+  0%   { opacity: 0; transform: scale(0.95); }
+  30%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.05); }
+}
+.intro-orb-wrap {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  animation: intro-pop 0.8s ease-out both;
+}
+.intro-ring {
+  position: absolute;
+  left: 50%; top: 50%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--accent), 0.5);
+  transform: translate(-50%, -50%) scale(0.4);
+  animation: intro-ring 1.6s ease-out forwards;
+  opacity: 0;
+}
+.intro-dot {
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgb(var(--accent-3));
+  box-shadow: 0 0 8px rgb(var(--accent-3));
+  transform: translate(-50%, -50%) scale(0);
+  animation: intro-dot 1.2s ease-out forwards;
+}
+@keyframes intro-dot {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+}
+
+/* ── Calls ────────────────────────────────── */
+.intro-sonar {
+  position: absolute; left: 50%; top: 50%;
+  width: 0; height: 0;
+  border: 2px solid rgba(var(--accent), 0.6);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: intro-sonar 1.6s ease-out forwards;
+  opacity: 0;
+  box-shadow: 0 0 24px rgba(var(--accent), 0.4);
+}
+@keyframes intro-sonar {
+  0% { width: 0; height: 0; opacity: 0; }
+  20% { opacity: 0.9; }
+  100% { width: 700px; height: 700px; opacity: 0; }
+}
+.intro-phone-burst {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 24px;
+  background: linear-gradient(135deg, rgba(var(--accent), 0.2), rgba(var(--accent-2), 0.1));
+  border: 1.5px solid rgba(var(--accent), 0.6);
+  border-radius: 50%;
+  animation: intro-pop 0.7s 0.1s ease-out both, intro-phone-shake 1.2s 0.3s ease-in-out infinite;
+  box-shadow: 0 0 40px rgba(var(--accent), 0.5);
+}
+@keyframes intro-phone-shake {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+  25% { transform: translate(-50%, -50%) rotate(-12deg); }
+  75% { transform: translate(-50%, -50%) rotate(12deg); }
+}
+.intro-waveform {
+  position: absolute;
+  left: 50%; top: calc(50% + 110px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.intro-wave-bar {
+  width: 4px;
+  background: linear-gradient(180deg, rgb(var(--accent)), rgb(var(--accent-2)));
+  border-radius: 2px;
+  opacity: 0;
+  animation: intro-wave-bar 0.8s ease-out both, intro-wave-bounce 0.7s ease-in-out 0.8s infinite;
+  transform-origin: center;
+}
+@keyframes intro-wave-bar {
+  0% { opacity: 0; transform: scaleY(0); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+@keyframes intro-wave-bounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+/* ── Email ────────────────────────────────── */
+.intro-envelope {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  animation: intro-pop 0.6s ease-out both;
+  filter: drop-shadow(0 12px 32px rgba(var(--accent), 0.4));
+}
+.intro-plane {
+  position: absolute;
+  left: -40px;
+  animation: intro-plane-fly 1.5s ease-out both;
+  filter: drop-shadow(0 0 8px rgba(var(--accent-3), 0.6));
+  transform: rotate(-12deg);
+}
+@keyframes intro-plane-fly {
+  0%   { left: -40px; opacity: 0; transform: rotate(-12deg) translateX(0); }
+  20%  { opacity: 1; }
+  100% { left: calc(100% + 40px); opacity: 0; transform: rotate(-12deg) translateX(60px); }
+}
+
+/* ── Posts ────────────────────────────────── */
+.intro-burst-core {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 18px;
+  background: rgba(var(--accent), 0.12);
+  border: 1.5px solid rgba(var(--accent), 0.4);
+  border-radius: 16px;
+  animation: intro-pop 0.5s ease-out both;
+  box-shadow: 0 0 40px rgba(var(--accent), 0.4);
+}
+.intro-confetti {
+  position: absolute;
+  left: 50%; top: 50%;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(var(--accent), 0.25), rgba(var(--accent-2), 0.15));
+  border: 1px solid rgba(var(--accent), 0.4);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(var(--accent-3));
+  white-space: nowrap;
+  transform: translate(-50%, -50%) scale(0);
+  animation: intro-confetti 1.4s ease-out both;
+}
+@keyframes intro-confetti {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
+}
+.intro-ray {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 80px;
+  background: linear-gradient(180deg, rgba(var(--accent), 0.8), transparent);
+  transform-origin: top center;
+  margin-left: -1px;
+  animation: intro-ray 1s ease-out both;
+}
+@keyframes intro-ray {
+  0%   { opacity: 0; transform: scaleY(0.3); }
+  40%  { opacity: 1; }
+  100% { opacity: 0; transform: scaleY(2); }
+}
+
+/* ── ATS ──────────────────────────────────── */
+.intro-doc {
+  position: absolute;
+  left: 50%; top: 50%;
+  margin-left: -90px; margin-top: -120px;
+  width: 180px; height: 240px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(var(--accent), 0.4);
+  border-radius: 8px;
+  padding: 22px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+  animation: intro-doc-rise 0.7s ease-out both;
+  box-shadow: 0 8px 24px rgba(var(--accent), 0.15);
+}
+@keyframes intro-doc-rise {
+  0%   { opacity: 0; transform: translateY(40px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.intro-doc-line {
+  height: 6px;
+  background: linear-gradient(90deg, rgba(var(--accent-3), 0.4), rgba(var(--accent-3), 0.1));
+  border-radius: 3px;
+}
+.intro-scanline {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 480px; height: 3px;
+  margin-left: -240px;
+  background: linear-gradient(90deg, transparent, rgb(var(--success)) 30%, rgb(var(--success)) 70%, transparent);
+  box-shadow: 0 0 24px rgb(var(--success));
+  animation: intro-scanline-v 1.4s 0.3s ease-in-out both;
+}
+@keyframes intro-scanline-v {
+  0%   { top: calc(50% - 140px); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: calc(50% + 140px); opacity: 0; }
+}
+.intro-scan-tag {
+  position: absolute;
+  left: 50%; top: calc(50% + 160px);
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px;
+  background: rgba(var(--success), 0.12);
+  border: 1px solid rgba(var(--success), 0.4);
+  border-radius: 999px;
+  animation: intro-pop 0.5s 0.9s ease-out both;
+}
+
+/* ── Interview ────────────────────────────── */
+.intro-face-frame {
+  position: absolute;
+  left: 50%; top: 50%;
+  margin-left: -130px; margin-top: -150px;
+  width: 260px; height: 300px;
+  background: radial-gradient(ellipse at 50% 35%, rgba(60, 40, 80, 0.5) 0%, transparent 60%), linear-gradient(180deg, #18121a, #0a0a14);
+  border-radius: 12px;
+  animation: intro-pop 0.6s ease-out both;
+  overflow: hidden;
+}
+.intro-corner {
+  position: absolute;
+  width: 22px; height: 22px;
+  border-color: rgb(var(--accent));
+  box-shadow: 0 0 12px rgba(var(--accent), 0.6);
+  opacity: 0;
+  animation: intro-fade 0.4s 0.5s ease-out both;
+}
+.intro-corner-tl { top: 20%; left: 18%; border-top: 2px solid; border-left: 2px solid; }
+.intro-corner-tr { top: 20%; right: 18%; border-top: 2px solid; border-right: 2px solid; }
+.intro-corner-bl { bottom: 22%; left: 18%; border-bottom: 2px solid; border-left: 2px solid; }
+.intro-corner-br { bottom: 22%; right: 18%; border-bottom: 2px solid; border-right: 2px solid; }
+.intro-face-silhouette {
+  position: absolute;
+  left: 50%; top: 55%;
+  transform: translate(-50%, -50%);
+}
+.intro-face-head {
+  width: 90px; height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #4a3a55, #2a1f30 70%);
+  margin: 0 auto;
+}
+.intro-face-body {
+  width: 160px; height: 100px;
+  background: linear-gradient(180deg, #3a2d44 0%, #1a1424 100%);
+  border-radius: 60% 60% 0 0 / 50% 50% 0 0;
+  margin: -8px auto 0;
+}
+.intro-scanline-vert {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgb(var(--accent)) 50%, transparent);
+  box-shadow: 0 0 12px rgb(var(--accent));
+  animation: intro-vert-scan 1.6s 0.2s ease-in-out both;
+}
+@keyframes intro-vert-scan {
+  0%   { top: 0; opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.intro-face-tag {
+  position: absolute;
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--accent), 0.4);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: rgb(var(--accent-3));
+  display: flex; align-items: center; gap: 6px;
+  animation: intro-tag-in 0.4s ease-out both;
+}
+.intro-face-tag-1 { left: calc(50% + 130px); top: calc(50% - 130px); animation-delay: 0.5s; }
+.intro-face-tag-2 { left: calc(50% + 130px); top: calc(50% - 40px);  animation-delay: 0.7s; }
+.intro-face-tag-3 { left: calc(50% + 130px); top: calc(50% + 50px);  animation-delay: 0.9s; }
+@keyframes intro-tag-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Attendance ───────────────────────────── */
+.intro-clock {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  animation: intro-pop 0.6s ease-out both;
+}
+@keyframes intro-clock-fill { to { stroke-dashoffset: 0; } }
+@keyframes intro-tick { from { opacity: 0; } to { opacity: 1; } }
+@keyframes intro-clockhand-h {
+  from { transform: rotate(-180deg); }
+  to { transform: rotate(110deg); }
+}
+@keyframes intro-clockhand-m {
+  from { transform: rotate(-360deg); }
+  to { transform: rotate(45deg); }
+}
+.intro-geo-pin {
+  position: absolute;
+  left: calc(50% + 120px); top: calc(50% - 60px);
+  animation: intro-geo-drop 0.7s 0.6s cubic-bezier(0.5, 1.4, 0.7, 1) both;
+  filter: drop-shadow(0 4px 16px rgba(var(--accent), 0.6));
+}
+@keyframes intro-geo-drop {
+  0% { opacity: 0; transform: translateY(-30px) scale(0.5); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Analytics ────────────────────────────── */
+.intro-bars {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, calc(-50% + 30px));
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.intro-bar {
+  width: 26px;
+  background: linear-gradient(180deg, rgb(var(--accent)), rgba(var(--accent-2), 0.5));
+  border-radius: 4px 4px 0 0;
+  opacity: 0;
+  transform-origin: bottom;
+  animation: intro-bar-grow 0.6s ease-out both;
+  box-shadow: 0 0 12px rgba(var(--accent), 0.4);
+}
+@keyframes intro-bar-grow {
+  0% { opacity: 0; transform: scaleY(0); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+.intro-chart {
+  position: absolute;
+  left: 50%; top: calc(50% - 100px);
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: intro-fade 0.5s 0.3s both;
+}
+
+/* ── Settings ─────────────────────────────── */
+.intro-gear {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  animation: intro-pop 0.6s ease-out both;
+}
+.intro-orbit {
+  position: absolute;
+  left: 50%; top: 50%;
+  border: 1px dashed rgba(var(--accent), 0.4);
+  border-radius: 50%;
+  animation: intro-orbit-spin 4s linear infinite, intro-fade 0.6s both;
+}
+@keyframes intro-orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.intro-orbit-dot {
+  position: absolute;
+  left: 50%; top: -6px;
+  width: 12px; height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  box-shadow: 0 0 16px currentColor;
+}
+
+/* ── Page content reveal ──────────────────── */
+/* Pages animate their content in after the intro */
+.page-reveal {
+  animation: page-reveal 0.5s 0.7s ease-out both;
+}
+@keyframes page-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Persistent ambient background per page ── */
+/* These are subtle bg motifs that stay after the intro fades */
+.ambient-calls,
+.ambient-email,
+.ambient-posts,
+.ambient-interview,
+.ambient-ats,
+.ambient-attendance,
+.ambient-analytics,
+.ambient-settings,
+.ambient-overview {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* Floating particles ambient (subtle) */
+.ambient-particle {
+  position: absolute;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: rgba(var(--accent-3), 0.5);
+  box-shadow: 0 0 8px rgba(var(--accent), 0.5);
+  animation: ambient-float 12s linear infinite;
+}
+@keyframes ambient-float {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  10%  { opacity: 0.8; }
+  90%  { opacity: 0.8; }
+  100% { transform: translate(var(--fx), var(--fy)); opacity: 0; }
+}
+
+/* Calls ambient — slow concentric pulse */
+.ambient-calls::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 80%, rgba(var(--accent), 0.06), transparent 50%);
+  animation: ambient-breathe 6s ease-in-out infinite;
+}
+@keyframes ambient-breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Posts ambient — moving gradient sweep */
+.ambient-posts::before {
+  content: "";
+  position: absolute;
+  inset: -50% 0;
+  background: linear-gradient(120deg,
+    transparent 30%,
+    rgba(var(--accent), 0.05) 50%,
+    transparent 70%);
+  animation: ambient-sweep 8s linear infinite;
+}
+@keyframes ambient-sweep {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(50%); }
+}
+
+/* Analytics ambient — grid scan */
+.ambient-analytics::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(var(--accent), 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--accent), 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 70%);
+}
+
+/* Interview ambient — danger throb if armed */
+.ambient-interview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, rgba(var(--accent), 0.04), transparent 70%);
+}
+
+/* Settings ambient — orbit lines */
+.ambient-settings::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 800px; height: 800px;
+  margin: -400px 0 0 -400px;
+  border-radius: 50%;
+  border: 1px dashed rgba(var(--accent), 0.06);
+  animation: intro-orbit-spin 60s linear infinite;
+}
+.ambient-settings::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 1200px; height: 1200px;
+  margin: -600px 0 0 -600px;
+  border-radius: 50%;
+  border: 1px dashed rgba(var(--accent-3), 0.04);
+  animation: intro-orbit-spin 90s linear infinite reverse;
+}
+
+/* Attendance ambient — gentle pulse on geo-fence */
+.ambient-attendance::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 20% 30%, rgba(var(--accent), 0.05), transparent 40%);
+}
+
+/* Email ambient — drifting envelope shadows */
+.ambient-email::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(var(--accent), 0.05), transparent 30%),
+    radial-gradient(circle at 20% 80%, rgba(var(--accent-2), 0.05), transparent 30%);
+}
+
+/* ATS ambient — scan lines */
+.ambient-ats::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(var(--accent), 0.015) 3px,
+    rgba(var(--accent), 0.015) 4px
+  );
+  pointer-events: none;
+}
+
+/* Stagger reveal for card grids */
+.stagger-in > * {
+  opacity: 0;
+  animation: stagger-fade 0.5s ease-out both;
+}
+.stagger-in > *:nth-child(1)  { animation-delay: 0.75s; }
+.stagger-in > *:nth-child(2)  { animation-delay: 0.82s; }
+.stagger-in > *:nth-child(3)  { animation-delay: 0.89s; }
+.stagger-in > *:nth-child(4)  { animation-delay: 0.96s; }
+.stagger-in > *:nth-child(5)  { animation-delay: 1.03s; }
+.stagger-in > *:nth-child(6)  { animation-delay: 1.10s; }
+.stagger-in > *:nth-child(7)  { animation-delay: 1.17s; }
+.stagger-in > *:nth-child(8)  { animation-delay: 1.24s; }
+@keyframes stagger-fade {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
