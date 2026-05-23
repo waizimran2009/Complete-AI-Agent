@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: complete-ai-agent
+    env: node
+    buildCommand: npm install
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000

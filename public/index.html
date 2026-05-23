@@ -19,14 +19,15 @@
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
 
-  <!-- API client (sets up window.claude.complete + window.ariaChat) -->
+  <!-- API client (auth tokens + window.claude.complete + window.ariaChat) -->
   <script src="api-client.js"></script>
 
-  <!-- Design system components (order matters!) -->
+  <!-- Design system -->
   <script type="text/babel" src="icons.jsx"></script>
   <script type="text/babel" src="components.jsx"></script>
 
-  <!-- Page components -->
+  <!-- Pages -->
+  <script type="text/babel" src="page-login.jsx"></script>
   <script type="text/babel" src="page-overview.jsx"></script>
   <script type="text/babel" src="page-calls.jsx"></script>
   <script type="text/babel" src="page-email.jsx"></script>
@@ -58,10 +59,11 @@
     };
 
     function App() {
-      const [booted, setBooted]   = useState(false);
-      const [page, setPage]       = useState("chat");
-      const [theme, setTheme]     = useState("default");
-      const [navKey, setNavKey]   = useState(0);
+      const [authDone, setAuthDone] = useState(false);
+      const [booted,   setBooted]   = useState(false);
+      const [page,     setPage]     = useState("chat");
+      const [theme,    setTheme]    = useState("default");
+      const [navKey,   setNavKey]   = useState(0);
 
       useEffect(() => {
         if (theme === "default") document.documentElement.removeAttribute("data-theme");
@@ -76,23 +78,25 @@
 
       const meta = PAGE_META[page] || { title: "", sub: "" };
 
+      // Step 1: Auth gate
+      if (!authDone) {
+        return <LoginPage onLogin={() => setAuthDone(true)} />;
+      }
+
+      // Step 2: Launch screen
       if (!booted) {
         return <LaunchScreen onEnter={() => setBooted(true)} />;
       }
 
+      // Step 3: Main app
       return (
         <div className="app-root" style={{ display: "flex", flexDirection: "row" }}>
           <Sidebar current={page} onNavigate={navigate} />
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
             <TopBar title={meta.title} subtitle={meta.sub} theme={theme} setTheme={setTheme} />
             <main key={navKey} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
-
-              {/* Per-feature intro animation */}
               <PageIntro kind={page} label={meta.title} sublabel={meta.sub} k={navKey} />
-
-              {/* Ambient background motif */}
               <div className={`ambient-${page}`} />
-
               <div className="page-reveal" style={{ position: "relative", zIndex: 1 }}>
                 {page === "chat"       && <ChatPage />}
                 {page === "overview"   && <OverviewPage navigate={navigate} />}
