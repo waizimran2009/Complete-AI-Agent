@@ -54,7 +54,8 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✓ Complete AI Agent running at http://localhost:${PORT}`);
   const features = {
-    "Gemini AI":  !!process.env.GEMINI_API_KEY,
+    "Groq AI":    !!process.env.GROQ_API_KEY,
+    "Cloudflare": !!process.env.CLOUDFLARE_API_TOKEN,
     "Supabase":   !!process.env.SUPABASE_URL,
     "Email":      !!process.env.EMAIL_USER,
     "Calls":      !!process.env.TWILIO_ACCOUNT_SID,
