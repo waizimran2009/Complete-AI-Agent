@@ -1,9 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const { aiComplete } = require("../lib/ai");
 
 function getSupabase() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return null;
@@ -47,13 +45,12 @@ router.post("/respond", async (req, res) => {
 
   if (speech) {
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent(
+      reply = await aiComplete(
         `You are Aria, the AI phone receptionist for ${company}, which offers ${services}.\n` +
         `A caller said: "${speech}"\n` +
         `Respond naturally as a receptionist in 1-2 sentences. Be helpful and professional.`
       );
-      reply = result.response.text().trim();
+      reply = reply.trim();
     } catch (_) {}
 
     const sb = getSupabase();

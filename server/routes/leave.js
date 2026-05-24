@@ -1,9 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const { aiComplete } = require("../lib/ai");
 
 function getSupabase() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return null;
@@ -36,11 +34,10 @@ router.post("/apply", async (req, res) => {
       history = data || [];
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `Analyze this leave request.\nEmployee: ${employeeName}\nType: ${type}\nDuration: ${days} days (${startDate} to ${endDate})\nReason: ${reason || "Not specified"}\nRecent leave history: ${JSON.stringify(history)}\n\nReturn JSON:\n{\n  "recommendation": "approved|flagged|denied",\n  "note": "<1 sentence explanation>",\n  "pattern_flag": <true|false>\n}`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
+    let text = await aiComplete(prompt);
+    text = text.trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
     const parsed = JSON.parse(text);
     aiRecommendation = parsed.recommendation;
     aiNote = parsed.note;

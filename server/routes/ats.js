@@ -3,10 +3,8 @@ const router = express.Router();
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const { aiComplete } = require("../lib/ai");
 
 const upload = multer({
   dest: "/tmp/ats-uploads/",
@@ -41,12 +39,10 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `You are an ATS system. Analyze this resume for the role: ${jobRole}.\n${jobDescription ? `Job description: ${jobDescription}\n` : ""}Resume content:\n${fileContent.slice(0, 3000)}\n\nReturn JSON only:\n{\n  "score": <0-100>,\n  "verdict": "<Strong Match|Good Match|Partial Match|Weak Match>",\n  "summary": "<2 sentence summary>",\n  "strengths": ["strength1","strength2","strength3"],\n  "gaps": ["gap1","gap2"],\n  "skills": ["skill1","skill2","skill3"]\n}`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
-    text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+    let text = await aiComplete(prompt);
+    text = text.trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
     const parsed = JSON.parse(text);
 
     const sb = getSupabase();

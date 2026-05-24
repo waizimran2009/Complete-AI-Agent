@@ -1,9 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const { aiComplete } = require("../lib/ai");
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -30,11 +28,9 @@ router.post("/generate", async (req, res) => {
   };
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `Write a LinkedIn post for a software company.\n\nPost type: ${goalLabels[goal] || goal}.\nBrief: ${brief}\n\nRules:\n- 5-7 short paragraphs, each 1-2 sentences\n- Strong hook on line 1\n- Light emoji where natural (2-3 max)\n- End with one clear CTA\n- 3-5 hashtags at the bottom\n- No markdown, plain text only\n- 200 words max`;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-    res.json({ text });
+    const text = await aiComplete(prompt);
+    res.json({ text: text.trim() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

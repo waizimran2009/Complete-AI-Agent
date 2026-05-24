@@ -1,9 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const { aiComplete } = require("../lib/ai");
 
 function getSupabase() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return null;
@@ -15,11 +13,10 @@ router.post("/generate-questions", async (req, res) => {
   const { jobRole = "Software Engineer", jobDescription = "", numQuestions = 5 } = req.body;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `Generate ${numQuestions} interview questions for: ${jobRole}.\n${jobDescription ? `Job context: ${jobDescription}\n` : ""}Include a mix: technical (systems design, coding), behavioral, and situational.\n\nReturn JSON array:\n[\n  { "num": 1, "text": "question", "topic": "Systems design", "type": "technical" },\n  ...\n]`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
+    let text = await aiComplete(prompt);
+    text = text.trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
     const questions = JSON.parse(text);
     res.json({ questions });
   } catch (err) {
@@ -33,11 +30,10 @@ router.post("/score-answer", async (req, res) => {
   if (!question || !answer) return res.status(400).json({ error: "question and answer required" });
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `Score this interview answer for a ${jobRole} role.\n\nQuestion: ${question}\nAnswer: ${answer}\n\nReturn JSON:\n{\n  "score": <0-10>,\n  "feedback": "<2 sentence evaluation>",\n  "strengths": ["point1","point2"],\n  "improvements": ["point1"]\n}`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
+    let text = await aiComplete(prompt);
+    text = text.trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
     const scored = JSON.parse(text);
     res.json(scored);
   } catch (err) {

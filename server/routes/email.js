@@ -1,10 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const nodemailer = require("nodemailer");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const { aiComplete } = require("../lib/ai");
 
 function getSupabase() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return null;
@@ -25,10 +23,9 @@ router.post("/draft", async (req, res) => {
   if (!brief) return res.status(400).json({ error: "brief required" });
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `Write a ${tone} email.\nTo: ${to || "recipient"}\nSubject: ${subject || "Follow-up"}\nBrief: ${brief}\n\nRules: professional tone, concise, no markdown, include subject line at top.`;
-    const result = await model.generateContent(prompt);
-    res.json({ draft: result.response.text() });
+    const draft = await aiComplete(prompt);
+    res.json({ draft });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -41,10 +38,8 @@ router.post("/send", async (req, res) => {
 
   let body;
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `Write a ${tone} email.\nTo: ${to}\nSubject: ${subject}\nBrief: ${brief}\n\nReturn just the email body, no subject line, no markdown.`;
-    const result = await model.generateContent(prompt);
-    body = result.response.text();
+    body = await aiComplete(prompt);
   } catch (err) {
     return res.status(500).json({ error: "AI draft failed: " + err.message });
   }
