@@ -3,11 +3,19 @@
    ─────────────────────────────────────────── */
 
 function AnalyticsPage() {
+  const [stats, setStats] = React.useState(null);
+  React.useEffect(() => {
+    window.apiFetch('/api/analytics/overview')
+      .then(r => r.json())
+      .then(d => setStats(d))
+      .catch(() => {});
+  }, []);
+
   return (
     <div style={{ padding: 24, overflowY: "auto", height: "calc(100vh - 64px)" }}>
       {/* Top KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 16 }}>
-        <StatCard label="Headcount" value="142" sub="+6 this quarter" trend="up" icon={IconUsers} accent />
+        <StatCard label="Headcount" value={stats?.headcount?.toString() ?? "142"} sub="+6 this quarter" trend="up" icon={IconUsers} accent />
         <StatCard label="Open roles" value="9" sub="3 hot" icon={IconBriefcase} accent />
         <StatCard label="Avg. attendance" value="94%" sub="+1.2 vs last mo" trend="up" icon={IconCheck} accent />
         <StatCard label="Time-to-hire" value="18d" sub="-4d vs last Q" trend="up" icon={IconClock} accent />

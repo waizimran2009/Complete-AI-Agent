@@ -25,6 +25,14 @@ function EmailPage() {
   const [selected, setSelected] = React.useState(INBOX_THREADS[0]);
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [tab, setTab] = React.useState("inbox"); // inbox | compose
+  const [sentLogs, setSentLogs] = React.useState([]);
+
+  React.useEffect(() => {
+    window.apiFetch('/api/email/history')
+      .then(r => r.json())
+      .then(d => setSentLogs(d.logs || []))
+      .catch(() => {});
+  }, []);
 
   return (
     <div style={{
@@ -41,10 +49,13 @@ function EmailPage() {
           selectedId={selected?.id}
           onSelect={setSelected}
           onCompose={() => setComposeOpen(true)}
+          sentLogs={sentLogs}
         />
       )}
       {composeOpen ? (
-        <ComposeView onClose={() => setComposeOpen(false)} />
+        <ComposeView onClose={() => setComposeOpen(false)} onSent={() => {
+          window.apiFetch('/api/email/history').then(r => r.json()).then(d => setSentLogs(d.logs || [])).catch(() => {});
+        }} />
       ) : (
         <ThreadDetail thread={selected} onCompose={() => setComposeOpen(true)} />
       )}
@@ -52,7 +63,9 @@ function EmailPage() {
   );
 }
 
-function InboxList({ threads, selectedId, onSelect, onCompose }) {
+function InboxList({ threads, selectedId, onSelect, onCompose, sentLogs }) {
+  const [activeTab, setActiveTab] = React.useState("all");
+
   return (
     <div className="card" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div className="card-header" style={{ padding: "12px 14px" }}>
@@ -63,68 +76,91 @@ function InboxList({ threads, selectedId, onSelect, onCompose }) {
       </div>
       <div style={{ padding: "10px 14px 0" }}>
         <div className="tabs" style={{ width: "100%" }}>
-          <button className="tab active" style={{ flex: 1 }}>All</button>
-          <button className="tab" style={{ flex: 1 }}>AI drafted <span style={{ marginLeft: 4, color: "rgb(var(--accent-3))" }}>·12</span></button>
-          <button className="tab" style={{ flex: 1 }}>Sent</button>
+          <button className={`tab ${activeTab === "all" ? "active" : ""}`} style={{ flex: 1 }} onClick={() => setActiveTab("all")}>All</button>
+          <button className={`tab ${activeTab === "drafted" ? "active" : ""}`} style={{ flex: 1 }} onClick={() => setActiveTab("drafted")}>AI drafted <span style={{ marginLeft: 4, color: "rgb(var(--accent-3))" }}>·12</span></button>
+          <button className={`tab ${activeTab === "sent" ? "active" : ""}`} style={{ flex: 1 }} onClick={() => setActiveTab("sent")}>Sent</button>
         </div>
       </div>
       <div style={{ flex: 1, overflowY: "auto", marginTop: 6 }}>
-        {threads.map(t => {
-          const active = t.id === selectedId;
-          return (
-            <button
-              key={t.id}
-              onClick={() => onSelect(t)}
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                padding: "12px 14px",
-                background: active ? "rgba(var(--accent), 0.08)" : "transparent",
-                borderLeft: "3px solid",
-                borderLeftColor: active ? "rgb(var(--accent))" : "transparent",
-                border: "none",
-                borderBottom: "1px solid var(--hairline)",
-                color: "var(--fg-1)",
-                transition: "background 0.15s ease",
-              }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-            >
-              <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
-                <div className="row gap-2" style={{ minWidth: 0, flex: 1 }}>
-                  {t.priority === "high" && <span className="dot dot-danger" style={{ flexShrink: 0 }} />}
-                  {t.priority === "med"  && <span className="dot dot-warning" style={{ flexShrink: 0 }} />}
-                  {t.priority === "low"  && <span className="dot" style={{ background: "rgba(255,255,255,0.2)", flexShrink: 0 }} />}
-                  <span className="truncate" style={{ fontSize: 12.5, fontWeight: 600 }}>{t.name}</span>
+        {activeTab === "sent" ? (
+          sentLogs.length > 0 ? (
+            <div className="col">
+              {sentLogs.slice(0, 20).map((log, i) => (
+                <div key={i} className="row gap-3" style={{ padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--hairline)" : "none" }}>
+                  <IconMail size={14} style={{ color: "rgb(var(--accent-3))", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }} className="truncate">{log.subject || "(No subject)"}</div>
+                    <div style={{ fontSize: 11, color: "var(--fg-3)" }} className="truncate">To: {log.to_email} · {new Date(log.created_at).toLocaleString()}</div>
+                  </div>
+                  <span className="pill pill-success" style={{ height: 20 }}>Sent</span>
                 </div>
-                <span style={{ fontSize: 10.5, color: "var(--fg-3)", flexShrink: 0 }}>{t.time}</span>
-              </div>
-              <div className="truncate" style={{ fontSize: 12, fontWeight: 500, marginBottom: 3 }}>{t.subj}</div>
-              <div className="truncate" style={{ fontSize: 11.5, color: "var(--fg-3)", marginBottom: 6 }}>{t.preview}</div>
-              {t.status === "drafted" && (
-                <span style={{
-                  fontSize: 9.5,
-                  fontWeight: 600,
-                  letterSpacing: "0.1em",
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                  background: "rgba(var(--accent), 0.14)",
-                  color: "rgb(var(--accent-3))",
-                  textTransform: "uppercase",
-                }}>
-                  <IconSparkles size={9} style={{ marginRight: 4, verticalAlign: -1 }} />
-                  AI drafted
-                </span>
-              )}
-              {t.status === "auto-replied" && (
-                <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: "0.1em", padding: "2px 6px", borderRadius: 4, background: "rgba(var(--success), 0.12)", color: "rgb(var(--success))", textTransform: "uppercase" }}>
-                  Auto-replied
-                </span>
-              )}
-            </button>
-          );
-        })}
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: "40px 16px", textAlign: "center", fontSize: 12, color: "var(--fg-3)" }}>
+              No sent emails yet.
+            </div>
+          )
+        ) : (
+          threads
+            .filter(t => activeTab === "all" || t.status === activeTab)
+            .map(t => {
+              const active = t.id === selectedId;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => onSelect(t)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "12px 14px",
+                    background: active ? "rgba(var(--accent), 0.08)" : "transparent",
+                    borderLeft: "3px solid",
+                    borderLeftColor: active ? "rgb(var(--accent))" : "transparent",
+                    border: "none",
+                    borderBottom: "1px solid var(--hairline)",
+                    color: "var(--fg-1)",
+                    transition: "background 0.15s ease",
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                >
+                  <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
+                    <div className="row gap-2" style={{ minWidth: 0, flex: 1 }}>
+                      {t.priority === "high" && <span className="dot dot-danger" style={{ flexShrink: 0 }} />}
+                      {t.priority === "med"  && <span className="dot dot-warning" style={{ flexShrink: 0 }} />}
+                      {t.priority === "low"  && <span className="dot" style={{ background: "rgba(255,255,255,0.2)", flexShrink: 0 }} />}
+                      <span className="truncate" style={{ fontSize: 12.5, fontWeight: 600 }}>{t.name}</span>
+                    </div>
+                    <span style={{ fontSize: 10.5, color: "var(--fg-3)", flexShrink: 0 }}>{t.time}</span>
+                  </div>
+                  <div className="truncate" style={{ fontSize: 12, fontWeight: 500, marginBottom: 3 }}>{t.subj}</div>
+                  <div className="truncate" style={{ fontSize: 11.5, color: "var(--fg-3)", marginBottom: 6 }}>{t.preview}</div>
+                  {t.status === "drafted" && (
+                    <span style={{
+                      fontSize: 9.5,
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      background: "rgba(var(--accent), 0.14)",
+                      color: "rgb(var(--accent-3))",
+                      textTransform: "uppercase",
+                    }}>
+                      <IconSparkles size={9} style={{ marginRight: 4, verticalAlign: -1 }} />
+                      AI drafted
+                    </span>
+                  )}
+                  {t.status === "auto-replied" && (
+                    <span style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: "0.1em", padding: "2px 6px", borderRadius: 4, background: "rgba(var(--success), 0.12)", color: "rgb(var(--success))", textTransform: "uppercase" }}>
+                      Auto-replied
+                    </span>
+                  )}
+                </button>
+              );
+            })
+        )}
       </div>
     </div>
   );
@@ -234,13 +270,15 @@ function ThreadDetail({ thread, onCompose }) {
 }
 
 // ── Compose view (live Claude generation) ────
-function ComposeView({ onClose }) {
+function ComposeView({ onClose, onSent }) {
   const [recipient, setRecipient] = React.useState("");
   const [purpose, setPurpose] = React.useState("");
   const [template, setTemplate] = React.useState("cold");
   const [tone, setTone] = React.useState("professional");
   const [output, setOutput] = React.useState("");
   const [generating, setGenerating] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [sendSuccess, setSendSuccess] = React.useState(false);
   const [error, setError] = React.useState(null);
 
   async function generate() {
@@ -251,6 +289,7 @@ function ComposeView({ onClose }) {
     setError(null);
     setGenerating(true);
     setOutput("");
+    setSendSuccess(false);
 
     const tpl = EMAIL_TEMPLATES.find(t => t.id === template);
     const prompt = `Write a ${tone} business email for Quantum Forge, a software company.\n\nContext: ${tpl?.desc || "Business email"}.\nRecipient: ${recipient || "(unspecified)"}\nGoal / contents the user wants conveyed: ${purpose}\n\nWrite ONLY the email itself, no preamble, no markdown, no "Subject:" line — start with the greeting (e.g. "Hi <name>,"). Keep it under 180 words, scannable, and human. Sign off as "Waiz · Quantum Forge".`;
@@ -262,6 +301,30 @@ function ComposeView({ onClose }) {
       setError("Generation failed. Tap Try again.");
     }
     setGenerating(false);
+  }
+
+  async function handleSendNow() {
+    if (!output) return;
+    setSending(true);
+    setError(null);
+    try {
+      const tpl = EMAIL_TEMPLATES.find(t => t.id === template);
+      const subjectLine = `${tpl?.label || "Email"} — ${purpose.slice(0, 60)}`;
+      const sendRes = await window.apiFetch('/api/email/send', {
+        method: 'POST',
+        body: JSON.stringify({ to: recipient, subject: subjectLine, brief: purpose }),
+      });
+      const sendData = await sendRes.json();
+      if (sendData.error) {
+        setError(`Send failed: ${sendData.error}`);
+      } else {
+        setSendSuccess(true);
+        if (onSent) onSent();
+      }
+    } catch (err) {
+      setError(`Send failed: ${err.message}`);
+    }
+    setSending(false);
   }
 
   return (
@@ -437,10 +500,37 @@ function ComposeView({ onClose }) {
             )}
           </div>
           {output && (
-            <div className="row gap-2" style={{ marginTop: 12, justifyContent: "flex-end" }}>
-              <button className="btn">Save as draft</button>
-              <button className="btn">Schedule</button>
-              <button className="btn btn-primary"><IconSend size={13} />Send now</button>
+            <div className="col gap-2" style={{ marginTop: 12 }}>
+              {sendSuccess && (
+                <div className="row gap-2" style={{ padding: "10px 14px", background: "rgba(var(--success), 0.08)", border: "1px solid rgba(var(--success), 0.25)", borderRadius: "var(--r-md)" }}>
+                  <IconCheck size={13} style={{ color: "rgb(var(--success))" }} />
+                  <span style={{ fontSize: 12, color: "rgb(var(--success))", fontWeight: 500 }}>Email sent successfully!</span>
+                </div>
+              )}
+              <div className="row gap-2" style={{ justifyContent: "flex-end" }}>
+                <button className="btn">Save as draft</button>
+                <button className="btn">Schedule</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSendNow}
+                  disabled={sending || sendSuccess}
+                >
+                  {sending ? (
+                    <>
+                      <span className="row gap-1">
+                        {[0,1,2].map(i => (
+                          <span key={i} style={{ width: 4, height: 4, borderRadius: "50%", background: "white", animation: `pulse-soft 1s ${i*0.15}s infinite` }} />
+                        ))}
+                      </span>
+                      Sending…
+                    </>
+                  ) : sendSuccess ? (
+                    <><IconCheck size={13} />Sent</>
+                  ) : (
+                    <><IconSend size={13} />Send now</>
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>

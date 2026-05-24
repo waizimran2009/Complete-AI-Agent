@@ -28,13 +28,72 @@ const JD_CRITERIA = [
 function ATSPage() {
   const [tab, setTab] = React.useState("all");
   const [reprocessing, setReprocessing] = React.useState(false);
+  const [resumes, setResumes] = React.useState(null); // null = loading
+  const [uploading, setUploading] = React.useState(false);
+  const [uploadResult, setUploadResult] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+
+  React.useEffect(() => {
+    window.apiFetch('/api/ats/resumes')
+      .then(r => r.json())
+      .then(d => setResumes(d.resumes || []))
+      .catch(() => setResumes([]));
+  }, []);
+
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadResult(null);
+    try {
+      const form = new FormData();
+      form.append('resume', file);
+      form.append('jobRole', 'Senior Backend Engineer');
+      const token = window.__auth.getToken();
+      const res = await fetch('/api/ats/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      const data = await res.json();
+      setUploadResult(data);
+      // Refresh list
+      window.apiFetch('/api/ats/resumes').then(r => r.json()).then(d => setResumes(d.resumes || []));
+    } catch(err) {
+      setUploadResult({ error: err.message });
+    }
+    setUploading(false);
+  }
 
   function reprocess() {
     setReprocessing(true);
     setTimeout(() => setReprocessing(false), 1800);
   }
 
-  const shown = RESUMES.filter(r => tab === "all" || r.status === tab);
+  const activeList = resumes && resumes.length > 0 ? resumes : RESUMES;
+
+  // For real resumes, map API fields to display shape; fallback RESUMES already have the right shape.
+  function normalizeResume(r) {
+    if (r.filename !== undefined) {
+      // Real API resume
+      return {
+        id: r.id,
+        name: r.filename,
+        fit: r.score || 0,
+        status: r.verdict ? (r.score >= 80 ? "shortlist" : r.score >= 60 ? "review" : "rejected") : "review",
+        skills: r.skills || [],
+        salary: null,
+        flag: r.verdict || null,
+        yrs: null,
+        loc: null,
+        _raw: r,
+      };
+    }
+    return r;
+  }
+
+  const normalizedList = activeList.map(normalizeResume);
+  const shown = normalizedList.filter(r => tab === "all" || r.status === tab);
 
   return (
     <div style={{ padding: 24, display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden" }}>
@@ -56,7 +115,10 @@ function ATSPage() {
             </div>
             <div className="row gap-2">
               <button className="btn btn-sm"><IconFileText size={13} />Edit spec</button>
-              <button className="btn btn-sm"><IconPaperclip size={13} />Upload CVs</button>
+              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt" style={{display:"none"}} onChange={handleFileUpload} />
+              <button className="btn btn-primary btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                {uploading ? "Analyzing…" : <><IconPaperclip size={13} />Upload CV</>}
+              </button>
             </div>
           </div>
         </div>
@@ -118,19 +180,36 @@ function ATSPage() {
         <div className="card-header">
           <div className="row gap-3">
             <h3 className="h3">Ranked candidates</h3>
-            <span className="pill pill-accent">{RESUMES.length} of 412 shown</span>
+            <span className="pill pill-accent">{normalizedList.length} of 412 shown</span>
           </div>
           <div className="tabs">
             {[
-              ["all", `All (${RESUMES.length})`],
-              ["shortlist", `Shortlist (${RESUMES.filter(r => r.status === "shortlist").length})`],
-              ["review", `Review (${RESUMES.filter(r => r.status === "review").length})`],
-              ["rejected", `Rejected (${RESUMES.filter(r => r.status === "rejected").length})`],
+              ["all", `All (${normalizedList.length})`],
+              ["shortlist", `Shortlist (${normalizedList.filter(r => r.status === "shortlist").length})`],
+              ["review", `Review (${normalizedList.filter(r => r.status === "review").length})`],
+              ["rejected", `Rejected (${normalizedList.filter(r => r.status === "rejected").length})`],
             ].map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)} className={`tab ${tab === id ? "active" : ""}`}>{label}</button>
             ))}
           </div>
         </div>
+
+        {uploadResult && !uploadResult.error && (
+          <div style={{ margin: "0 16px 12px", padding: 14, background: "rgba(var(--success), 0.08)", border: "1px solid rgba(var(--success), 0.25)", borderRadius: "var(--r-md)" }}>
+            <div className="row gap-2">
+              <IconCheck size={14} style={{ color: "rgb(var(--success))" }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{uploadResult.filename} — {uploadResult.verdict}</span>
+              <span className="num" style={{ fontSize: 20, fontWeight: 700, color: "rgb(var(--success))", marginLeft: "auto" }}>{uploadResult.score}</span>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--fg-2)", marginTop: 6 }}>{uploadResult.summary}</div>
+          </div>
+        )}
+        {uploadResult && uploadResult.error && (
+          <div style={{ margin: "0 16px 12px", padding: 14, background: "rgba(var(--danger), 0.08)", border: "1px solid rgba(var(--danger), 0.25)", borderRadius: "var(--r-md)", fontSize: 12, color: "rgb(var(--danger))" }}>
+            Upload failed: {uploadResult.error}
+          </div>
+        )}
+
         <div style={{
           display: "grid",
           gridTemplateColumns: "60px 1.6fr 0.7fr 1.2fr 0.8fr 100px",
@@ -148,6 +227,13 @@ function ATSPage() {
           <span style={{ textAlign: "right" }}>Action</span>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>
+          {resumes === null && (
+            <div className="col gap-3" style={{ padding: "24px 20px" }}>
+              {[0,1,2].map(i => (
+                <div key={i} className="skeleton" style={{ height: 52, borderRadius: "var(--r-md)" }} />
+              ))}
+            </div>
+          )}
           {shown.map((r, i) => (
             <div key={r.id} className="anim-slide-up" style={{
               display: "grid",
@@ -163,7 +249,7 @@ function ATSPage() {
             >
               <span style={{ fontSize: 18, fontWeight: 700, color: i < 3 ? "rgb(var(--accent-3))" : "var(--fg-3)" }}>
                 {i < 3 && <span style={{ fontSize: 9, marginRight: 3, verticalAlign: 3 }}>#</span>}
-                {RESUMES.indexOf(r) + 1}
+                {i + 1}
               </span>
               <div className="col">
                 <div className="row gap-2">
@@ -175,7 +261,11 @@ function ATSPage() {
                     background: r.flag === "Top match" ? "rgba(var(--success), 0.08)" : "rgba(255,255,255,0.03)",
                   }}>{r.flag}</span>}
                 </div>
-                <span style={{ fontSize: 11, color: "var(--fg-3)" }}>{r.yrs}y · {r.loc}</span>
+                {(r.yrs !== null || r.loc) && (
+                  <span style={{ fontSize: 11, color: "var(--fg-3)" }}>
+                    {r.yrs !== null ? `${r.yrs}y` : ""}{r.yrs !== null && r.loc ? " · " : ""}{r.loc || ""}
+                  </span>
+                )}
               </div>
               <div className="col gap-1">
                 <div style={{ height: 5, background: "rgba(255,255,255,0.04)", borderRadius: 999, overflow: "hidden", width: 80 }}>
@@ -194,12 +284,12 @@ function ATSPage() {
                 </span>
               </div>
               <div className="row gap-1" style={{ flexWrap: "wrap" }}>
-                {r.skills.slice(0, 3).map(s => (
+                {(r.skills || []).slice(0, 3).map(s => (
                   <span key={s} className="pill" style={{ height: 19, fontSize: 10 }}>{s}</span>
                 ))}
-                {r.skills.length > 3 && <span style={{ fontSize: 10, color: "var(--fg-3)" }}>+{r.skills.length - 3}</span>}
+                {(r.skills || []).length > 3 && <span style={{ fontSize: 10, color: "var(--fg-3)" }}>+{r.skills.length - 3}</span>}
               </div>
-              <span className="num" style={{ fontSize: 12.5, color: "var(--fg-1)" }}>{r.salary}</span>
+              <span className="num" style={{ fontSize: 12.5, color: "var(--fg-1)" }}>{r.salary || "—"}</span>
               <div style={{ textAlign: "right" }}>
                 {r.status === "shortlist" && <button className="btn btn-sm btn-primary"><IconVideo size={11} />Interview</button>}
                 {r.status === "review"    && <button className="btn btn-sm">Review</button>}

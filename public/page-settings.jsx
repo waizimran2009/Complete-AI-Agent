@@ -29,6 +29,14 @@ const LANGUAGES = [
 function SettingsPage() {
   const [selectedModel, setSelectedModel] = React.useState("llama-3.1-70b");
   const [langs, setLangs] = React.useState(LANGUAGES);
+  const [health, setHealth] = React.useState(null);
+
+  React.useEffect(() => {
+    fetch('/api/health')
+      .then(r => r.json())
+      .then(d => setHealth(d))
+      .catch(() => {});
+  }, []);
 
   function toggleLang(code) {
     setLangs(ls => ls.map(l => l.code === code ? { ...l, enabled: !l.enabled } : l));
@@ -192,7 +200,10 @@ function SettingsPage() {
                 All data is stored in your Supabase project
               </div>
             </div>
-            <span className="pill pill-success"><span className="dot dot-success" />Connected</span>
+            <span className={`pill ${health?.features?.database ? "pill-success" : "pill-warning"}`}>
+              <span className={`dot ${health?.features?.database ? "dot-success" : "dot-warning"}`} />
+              {health?.features?.database ? "Connected" : "Not configured"}
+            </span>
           </div>
           <div className="card-body col gap-3">
             <div style={{
@@ -209,7 +220,7 @@ function SettingsPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {[
-                { label: "Tables",  value: "23",  sub: "auth · calls · emails…" },
+                { label: "Tables",  value: health?.features?.database ? "8" : "—",  sub: "auth · calls · emails…" },
                 { label: "Rows",    value: "184k",sub: "+4.2k this week" },
                 { label: "Storage", value: "12.4 GB", sub: "of 100 GB" },
                 { label: "Realtime",value: "8 ch",sub: "subscribed" },
@@ -256,8 +267,8 @@ function SettingsPage() {
         </div>
         <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
           {[
-            { name: "Twilio",     desc: "Phone numbers + voice", connected: true,  initial: "T" },
-            { name: "SendGrid",   desc: "Outbound email",        connected: true,  initial: "S" },
+            { name: "Twilio",     desc: "Phone numbers + voice", connected: health?.features?.calls ?? true,  initial: "T" },
+            { name: "SendGrid",   desc: "Outbound email",        connected: health?.features?.email ?? true,  initial: "S" },
             { name: "LinkedIn",   desc: "Posting & DMs",         connected: true,  initial: "in" },
             { name: "Google Cal", desc: "Demo booking",          connected: true,  initial: "G" },
             { name: "Slack",      desc: "Internal alerts",       connected: true,  initial: "#" },

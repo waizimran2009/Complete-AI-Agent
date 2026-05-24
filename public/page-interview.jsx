@@ -213,6 +213,19 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack }) {
   const [elapsed, setElapsed] = React.useState(382); // 6m 22s
   const [warning, setWarning] = React.useState(false);
   const [questionIdx, setQuestionIdx] = React.useState(2);
+  const [aiQuestions, setAiQuestions] = React.useState(null);
+
+  React.useEffect(() => {
+    window.apiFetch('/api/interviews/generate-questions', {
+      method: 'POST',
+      body: JSON.stringify({ jobRole: candidate.role, numQuestions: 5 }),
+    })
+      .then(r => r.json())
+      .then(d => setAiQuestions(d.questions))
+      .catch(() => {}); // fallback to static INTERVIEW_QUESTIONS
+  }, [candidate.role]);
+
+  const questions = aiQuestions || INTERVIEW_QUESTIONS;
 
   React.useEffect(() => {
     const id = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -268,10 +281,22 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack }) {
             <button className="btn btn-sm btn-danger" onClick={() => setWarning(true)}>
               <IconMonitor size={13} />Simulate tab switch
             </button>
-            <button className="btn btn-sm btn-danger" onClick={goTerminated}>
+            <button className="btn btn-sm btn-danger" onClick={() => {
+              window.apiFetch('/api/interviews/session/demo-' + candidate.id + '/disqualify', {
+                method: 'PATCH',
+                body: JSON.stringify({ reason: 'manual termination' }),
+              }).catch(() => {});
+              goTerminated();
+            }}>
               <IconAlertTriangle size={13} />Terminate
             </button>
-            <button className="btn btn-sm" onClick={goResults}>End normally</button>
+            <button className="btn btn-sm" onClick={() => {
+              window.apiFetch('/api/interviews/session/demo-' + candidate.id + '/complete', {
+                method: 'PATCH',
+                body: JSON.stringify({ finalScore: 8.7, summary: 'Interview completed' }),
+              }).catch(() => {});
+              goResults();
+            }}>End normally</button>
           </div>
         </div>
 
@@ -367,10 +392,10 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack }) {
             <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.2em", color: "rgb(var(--accent-3))", textTransform: "uppercase", marginTop: 16 }}>
               Aria · Interviewer
             </div>
-            <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 4 }}>Question {questionIdx + 1} of 5 · Systems design</div>
+            <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 4 }}>Question {questionIdx + 1} of {questions.length} · {questions[questionIdx]?.topic || "Systems design"}</div>
 
             <div style={{ marginTop: 18, fontSize: 13, color: "var(--fg-1)", textAlign: "center", maxWidth: 320, lineHeight: 1.5 }}>
-              "{INTERVIEW_QUESTIONS[questionIdx].text}"
+              "{questions[questionIdx]?.text}"
             </div>
 
             <div className="row gap-1" style={{ marginTop: 18, height: 22 }}>
@@ -392,10 +417,10 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack }) {
         <div style={{ padding: "12px 20px 16px", borderTop: "1px solid var(--hairline)", position: "relative", zIndex: 1 }}>
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
             <span className="label">Questions</span>
-            <span className="label">{questionIdx + 1} of {INTERVIEW_QUESTIONS.length}</span>
+            <span className="label">{questionIdx + 1} of {questions.length}</span>
           </div>
           <div className="col gap-2">
-            {INTERVIEW_QUESTIONS.map((q, i) => (
+            {questions.map((q, i) => (
               <div key={q.num} style={{
                 display: "flex",
                 alignItems: "center",

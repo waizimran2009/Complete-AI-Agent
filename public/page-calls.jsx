@@ -16,6 +16,21 @@ function CallsPage() {
   const [isLive, setIsLive] = React.useState(true);
   const [transcriptIdx, setTranscriptIdx] = React.useState(3);
   const [aiSpeaking, setAiSpeaking] = React.useState(false);
+  const [phoneNumber, setPhoneNumber] = React.useState(null);
+  const [callLogs, setCallLogs] = React.useState([]);
+  const [loadingLogs, setLoadingLogs] = React.useState(true);
+
+  React.useEffect(() => {
+    window.apiFetch('/api/calls/number')
+      .then(r => r.json())
+      .then(d => setPhoneNumber(d.number))
+      .catch(() => {});
+
+    window.apiFetch('/api/calls/logs')
+      .then(r => r.json())
+      .then(d => { setCallLogs(d.logs || []); setLoadingLogs(false); })
+      .catch(() => setLoadingLogs(false));
+  }, []);
 
   React.useEffect(() => {
     if (!isLive) return;
@@ -202,10 +217,10 @@ function CallsPage() {
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
             }}>
-              +1 (415) 555-QMAI
+              {phoneNumber || "+1 (xxx) xxx-xxxx"}
             </div>
             <div style={{ fontSize: 11.5, color: "var(--fg-3)", marginTop: 4 }}>
-              +1 (415) 555-7624 · Twilio number, US toll-free
+              {phoneNumber || "+1 (xxx) xxx-xxxx"} · Twilio number, US toll-free
             </div>
             <div className="row gap-2" style={{ marginTop: 14 }}>
               <button className="btn btn-sm"><IconCopy size={13} />Copy</button>
@@ -228,35 +243,48 @@ function CallsPage() {
             <button className="btn btn-sm btn-ghost">See all</button>
           </div>
           <div className="col" style={{ padding: "4px 0" }}>
-            {[
-              { name: "Marcus Lee",        org: "Trellis HQ",      time: "12 min ago", dur: "2:14", tag: "Booked demo", color: "success" },
-              { name: "Priya Anand",       org: "—",                time: "31 min ago", dur: "0:48", tag: "Pricing Q",   color: "accent" },
-              { name: "Anonymous",         org: "Recruiter call",   time: "1h ago",     dur: "0:22", tag: "Routed",     color: "default" },
-              { name: "Hassan Reza",       org: "Northstar SaaS",   time: "1h ago",     dur: "3:01", tag: "Support",    color: "warning" },
-              { name: "Yuki Tanaka",       org: "Otsuka & Co.",     time: "2h ago",     dur: "1:35", tag: "Booked demo",color: "success" },
-            ].map((c, i) => (
-              <div key={i} className="row gap-3" style={{
-                padding: "10px 18px",
-                borderTop: i > 0 ? "1px solid var(--hairline)" : "none",
-              }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  background: "rgba(255,255,255,0.04)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 600, color: "var(--fg-2)",
-                  flexShrink: 0,
+            {callLogs.length > 0 ? (
+              callLogs.slice(0, 10).map((log, i) => (
+                <div key={i} className="row gap-3" style={{ padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--hairline)" : "none" }}>
+                  <IconPhone size={14} style={{ color: "rgb(var(--accent-3))", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="truncate" style={{ fontSize: 13 }}>{log.caller_speech || "Inbound call"}</div>
+                    <div style={{ fontSize: 11, color: "var(--fg-3)" }}>{new Date(log.created_at).toLocaleString()}</div>
+                  </div>
+                  <span className="pill pill-success" style={{ height: 22 }}>{log.status}</span>
+                </div>
+              ))
+            ) : (
+              [
+                { name: "Marcus Lee",        org: "Trellis HQ",      time: "12 min ago", dur: "2:14", tag: "Booked demo", color: "success" },
+                { name: "Priya Anand",       org: "—",                time: "31 min ago", dur: "0:48", tag: "Pricing Q",   color: "accent" },
+                { name: "Anonymous",         org: "Recruiter call",   time: "1h ago",     dur: "0:22", tag: "Routed",     color: "default" },
+                { name: "Hassan Reza",       org: "Northstar SaaS",   time: "1h ago",     dur: "3:01", tag: "Support",    color: "warning" },
+                { name: "Yuki Tanaka",       org: "Otsuka & Co.",     time: "2h ago",     dur: "1:35", tag: "Booked demo",color: "success" },
+              ].map((c, i) => (
+                <div key={i} className="row gap-3" style={{
+                  padding: "10px 18px",
+                  borderTop: i > 0 ? "1px solid var(--hairline)" : "none",
                 }}>
-                  {c.name.split(" ").map(p => p[0]).slice(0,2).join("")}
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "50%",
+                    background: "rgba(255,255,255,0.04)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 600, color: "var(--fg-2)",
+                    flexShrink: 0,
+                  }}>
+                    {c.name.split(" ").map(p => p[0]).slice(0,2).join("")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="truncate" style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div>
+                    <div className="truncate" style={{ fontSize: 11, color: "var(--fg-3)" }}>{c.org} · {c.time}</div>
+                  </div>
+                  <span className={`pill pill-${c.color === "default" ? "" : c.color}`} style={{ height: 20, fontSize: 10 }}>{c.tag}</span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)", width: 36, textAlign: "right" }}>{c.dur}</span>
+                  <button className="btn btn-icon btn-sm btn-ghost"><IconPlay size={12} /></button>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="truncate" style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div>
-                  <div className="truncate" style={{ fontSize: 11, color: "var(--fg-3)" }}>{c.org} · {c.time}</div>
-                </div>
-                <span className={`pill pill-${c.color === "default" ? "" : c.color}`} style={{ height: 20, fontSize: 10 }}>{c.tag}</span>
-                <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)", width: 36, textAlign: "right" }}>{c.dur}</span>
-                <button className="btn btn-icon btn-sm btn-ghost"><IconPlay size={12} /></button>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 

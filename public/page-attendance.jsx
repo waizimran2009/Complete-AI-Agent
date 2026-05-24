@@ -26,11 +26,62 @@ const LEAVE_REQUESTS = [
 ];
 
 function AttendancePage() {
+  const [todayRecords, setTodayRecords] = React.useState(null);
+  const [checkingIn, setCheckingIn] = React.useState(false);
+  const [checkedIn, setCheckedIn] = React.useState(false);
+  const [checkInMsg, setCheckInMsg] = React.useState("");
+  const [lastId, setLastId] = React.useState(null);
+
+  React.useEffect(() => {
+    window.apiFetch('/api/attendance/today')
+      .then(r => r.json())
+      .then(d => setTodayRecords(d.records || []))
+      .catch(() => setTodayRecords([]));
+  }, []);
+
+  async function handleCheckIn(method = 'manual', wfh = false) {
+    setCheckingIn(true);
+    try {
+      const res = await window.apiFetch('/api/attendance/checkin', {
+        method: 'POST',
+        body: JSON.stringify({ employeeName: 'Admin User', method, wfh }),
+      });
+      const data = await res.json();
+      if (data.id) {
+        setCheckedIn(true);
+        setLastId(data.id);
+        setCheckInMsg(data.message || 'Checked in successfully');
+        // Refresh
+        window.apiFetch('/api/attendance/today').then(r => r.json()).then(d => setTodayRecords(d.records || []));
+      }
+    } catch(e) {
+      setCheckInMsg('Check-in failed: ' + e.message);
+    }
+    setCheckingIn(false);
+  }
+
+  async function handleCheckOut() {
+    if (!lastId) return;
+    await window.apiFetch('/api/attendance/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ employeeId: lastId }),
+    });
+    setCheckedIn(false);
+    setCheckInMsg('Checked out successfully');
+    window.apiFetch('/api/attendance/today').then(r => r.json()).then(d => setTodayRecords(d.records || []));
+  }
+
   return (
     <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden" }}>
       <div className="col gap-4" style={{ overflowY: "auto" }}>
-        <CheckInCard />
-        <PresenceTable />
+        <CheckInCard
+          checkingIn={checkingIn}
+          checkedIn={checkedIn}
+          checkInMsg={checkInMsg}
+          handleCheckIn={handleCheckIn}
+          handleCheckOut={handleCheckOut}
+        />
+        <PresenceTable todayRecords={todayRecords} />
       </div>
 
       <div className="col gap-4" style={{ overflowY: "auto" }}>
@@ -42,7 +93,7 @@ function AttendancePage() {
 }
 
 // ── Face check-in ────────────────────────────
-function CheckInCard() {
+function CheckInCard({ checkingIn, checkedIn, checkInMsg, handleCheckIn, handleCheckOut }) {
   const [phase, setPhase] = React.useState("idle"); // idle, scanning, success
   const [progress, setProgress] = React.useState(0);
 
@@ -56,6 +107,7 @@ function CheckInCard() {
       if (p >= 100) {
         clearInterval(id);
         setPhase("success");
+        handleCheckIn('manual');
         setTimeout(() => { setPhase("idle"); setProgress(0); }, 4000);
       }
     }, 60);
@@ -149,7 +201,7 @@ function CheckInCard() {
           }}>
             {phase === "idle" && "Look at the camera to check in"}
             {phase === "scanning" && `Scanning face… ${progress}%`}
-            {phase === "success" && "✓ Recognized · Waiz Imran"}
+            {phase === "success" && "✓ Recognized · Admin User"}
           </div>
         </div>
 
@@ -157,7 +209,7 @@ function CheckInCard() {
         <div className="col gap-3" style={{ flex: 1, justifyContent: "center" }}>
           <div className="label-accent">Face check-in</div>
           <h2 className="h1" style={{ fontSize: 22 }}>
-            {phase === "success" ? "Welcome back, Waiz" : "Check in to Quantum Forge"}
+            {checkedIn ? "Welcome back, Admin" : "Check in to Quantum Forge"}
           </h2>
           <div className="row gap-2" style={{ flexWrap: "wrap" }}>
             <span className="pill"><IconClock size={11} />{new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -167,13 +219,33 @@ function CheckInCard() {
           <p style={{ fontSize: 12.5, color: "var(--fg-3)", lineHeight: 1.55, maxWidth: 380 }}>
             Face match runs locally on-device — your photo never leaves the browser. Geo-fence checks you're within 200m of an approved office or your registered home address.
           </p>
+          {checkInMsg && (
+            <div style={{
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: checkInMsg.startsWith('Check-in failed') ? "rgb(var(--danger))" : "rgb(var(--success))",
+              padding: "6px 10px",
+              background: checkInMsg.startsWith('Check-in failed') ? "rgba(var(--danger), 0.08)" : "rgba(var(--success), 0.08)",
+              border: `1px solid ${checkInMsg.startsWith('Check-in failed') ? "rgba(var(--danger), 0.3)" : "rgba(var(--success), 0.3)"}`,
+              borderRadius: "var(--r-sm)",
+            }}>
+              {checkInMsg.startsWith('Check-in failed') ? "✕ " : "✓ "}{checkInMsg}
+            </div>
+          )}
           <div className="row gap-2">
-            <button className="btn btn-primary" onClick={startCheckIn} disabled={phase !== "idle"}>
-              {phase === "scanning" ? <>Scanning…</> :
-               phase === "success" ? <><IconCheck size={14} />Checked in</> :
+            <button className="btn btn-primary" onClick={startCheckIn} disabled={phase !== "idle" || checkingIn || checkedIn}>
+              {phase === "scanning" || checkingIn ? <>Scanning…</> :
+               phase === "success" || checkedIn ? <><IconCheck size={14} />Checked in</> :
                <><IconEye size={14} />Start face scan</>}
             </button>
-            <button className="btn">Check in from home (WFH)</button>
+            <button className="btn" onClick={() => handleCheckIn('manual', true)} disabled={checkingIn || checkedIn}>
+              Check in from home (WFH)
+            </button>
+            {checkedIn && (
+              <button className="btn btn-danger" onClick={handleCheckOut}>
+                Check out
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -181,13 +253,58 @@ function CheckInCard() {
   );
 }
 
-function PresenceTable() {
+function PresenceTable({ todayRecords }) {
+  const activeCount = todayRecords != null
+    ? todayRecords.length
+    : PRESENCE_NOW.filter(p => p.mode !== "absent" && p.mode !== "leave").length;
+
+  const displayRecords = todayRecords && todayRecords.length > 0 ? todayRecords : PRESENCE_NOW;
+
+  function getMode(record) {
+    if (record.mode) return record.mode;
+    if (record.is_wfh) return "wfh";
+    if (record.status === "absent") return "absent";
+    if (record.status === "leave") return "leave";
+    return "office";
+  }
+
+  function getInitials(record) {
+    if (record.initials) return record.initials;
+    const name = record.employee_name || "";
+    return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  }
+
+  function getName(record) {
+    return record.name || record.employee_name || "Unknown";
+  }
+
+  function getRole(record) {
+    return record.role || record.method || "";
+  }
+
+  function getLoc(record) {
+    if (record.loc) return record.loc;
+    return record.is_wfh ? "Remote" : "Office";
+  }
+
+  function getSince(record) {
+    if (record.since) return record.since;
+    if (record.check_in) {
+      try {
+        return new Date(record.check_in).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+      } catch(e) {
+        return record.check_in;
+      }
+    }
+    return "—";
+  }
+
   return (
     <div className="card">
       <div className="card-header">
         <div className="row gap-3">
           <h3 className="h3">Live presence</h3>
-          <span className="pill pill-success"><span className="dot dot-success" />{PRESENCE_NOW.filter(p => p.mode !== "absent" && p.mode !== "leave").length} active</span>
+          <span className="pill pill-success"><span className="dot dot-success" />{activeCount} active</span>
         </div>
         <div className="tabs">
           <button className="tab active">All</button>
@@ -197,44 +314,47 @@ function PresenceTable() {
         </div>
       </div>
       <div className="col">
-        {PRESENCE_NOW.map((p, i) => (
-          <div key={i} style={{
-            display: "grid",
-            gridTemplateColumns: "32px 1.3fr 1.1fr 0.8fr 100px",
-            gap: 12,
-            alignItems: "center",
-            padding: "11px 18px",
-            borderTop: i > 0 ? "1px solid var(--hairline)" : "none",
-          }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: "50%",
-              background: "rgba(255,255,255,0.05)",
-              border: "1.5px solid",
-              borderColor:
-                p.mode === "office" ? "rgba(var(--success), 0.5)" :
-                p.mode === "wfh"    ? "rgba(var(--accent), 0.5)" :
-                p.mode === "leave"  ? "rgba(var(--warning), 0.5)" :
+        {displayRecords.map((p, i) => {
+          const mode = getMode(p);
+          return (
+            <div key={i} style={{
+              display: "grid",
+              gridTemplateColumns: "32px 1.3fr 1.1fr 0.8fr 100px",
+              gap: 12,
+              alignItems: "center",
+              padding: "11px 18px",
+              borderTop: i > 0 ? "1px solid var(--hairline)" : "none",
+            }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: "50%",
+                background: "rgba(255,255,255,0.05)",
+                border: "1.5px solid",
+                borderColor:
+                  mode === "office" ? "rgba(var(--success), 0.5)" :
+                  mode === "wfh"    ? "rgba(var(--accent), 0.5)" :
+                  mode === "leave"  ? "rgba(var(--warning), 0.5)" :
                                        "rgba(var(--danger), 0.5)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 11, fontWeight: 600,
-              color: "var(--fg-1)",
-            }}>{p.initials}</div>
-            <div className="col" style={{ minWidth: 0 }}>
-              <span className="truncate" style={{ fontSize: 12.5, fontWeight: 500 }}>{p.name}</span>
-              <span className="truncate" style={{ fontSize: 11, color: "var(--fg-3)" }}>{p.role}</span>
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 600,
+                color: "var(--fg-1)",
+              }}>{getInitials(p)}</div>
+              <div className="col" style={{ minWidth: 0 }}>
+                <span className="truncate" style={{ fontSize: 12.5, fontWeight: 500 }}>{getName(p)}</span>
+                <span className="truncate" style={{ fontSize: 11, color: "var(--fg-3)" }}>{getRole(p)}</span>
+              </div>
+              <span className="truncate" style={{ fontSize: 12, color: "var(--fg-2)" }}>{getLoc(p)}</span>
+              <span style={{ fontSize: 11.5, color: "var(--fg-3)" }} className="num">
+                {mode === "absent" ? <span style={{ color: "rgb(var(--danger))" }}>{getSince(p)}</span> : `Since ${getSince(p)}`}
+              </span>
+              <div style={{ textAlign: "right" }}>
+                {mode === "office" && <span className="pill pill-success" style={{ height: 22 }}>In office</span>}
+                {mode === "wfh"    && <span className="pill pill-accent"  style={{ height: 22 }}>WFH</span>}
+                {mode === "leave"  && <span className="pill pill-warning" style={{ height: 22 }}>Leave</span>}
+                {mode === "absent" && <span className="pill pill-danger"  style={{ height: 22 }}>Absent</span>}
+              </div>
             </div>
-            <span className="truncate" style={{ fontSize: 12, color: "var(--fg-2)" }}>{p.loc}</span>
-            <span style={{ fontSize: 11.5, color: "var(--fg-3)" }} className="num">
-              {p.mode === "absent" ? <span style={{ color: "rgb(var(--danger))" }}>{p.since}</span> : `Since ${p.since}`}
-            </span>
-            <div style={{ textAlign: "right" }}>
-              {p.mode === "office" && <span className="pill pill-success" style={{ height: 22 }}>In office</span>}
-              {p.mode === "wfh"    && <span className="pill pill-accent"  style={{ height: 22 }}>WFH</span>}
-              {p.mode === "leave"  && <span className="pill pill-warning" style={{ height: 22 }}>Leave</span>}
-              {p.mode === "absent" && <span className="pill pill-danger"  style={{ height: 22 }}>Absent</span>}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

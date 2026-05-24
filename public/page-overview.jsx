@@ -9,6 +9,15 @@ function OverviewPage({ navigate }) {
     return () => clearInterval(id);
   }, []);
 
+  const [stats, setStats] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  React.useEffect(() => {
+    window.apiFetch('/api/analytics/overview')
+      .then(r => r.json())
+      .then(d => { setStats(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
   const ACTIVITY = [
     { time: "just now",    type: "call",      msg: "AI took inbound call from +1 (415) 555-2891 · routed to Sales", icon: IconPhone, color: "success" },
     { time: "2m ago",      type: "email",     msg: "Drafted reply to procurement@acme.io about SOC2 docs", icon: IconMail, color: "accent" },
@@ -42,8 +51,8 @@ function OverviewPage({ navigate }) {
             <div className="row gap-3" style={{ marginTop: 6, flexWrap: "wrap" }}>
               <span className="pill pill-success"><span className="dot dot-success" />All systems nominal</span>
               <span className="pill">Llama 3.1 70B · self-hosted</span>
-              <span className="pill">12 active workflows</span>
-              <span className="pill">14,238 ops today</span>
+              <span className="pill">{stats ? `${stats.headcount || 0} employees` : "Loading..."}</span>
+              <span className="pill">{stats ? `${(stats.emailsSent || 0) + (stats.callsHandled || 0)} ops today` : "..."}</span>
             </div>
           </div>
           <div className="col gap-2">
@@ -59,10 +68,10 @@ function OverviewPage({ navigate }) {
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        <StatCard label="Calls handled" value="247" sub="+18% vs last week" trend="up" icon={IconPhone} accent />
-        <StatCard label="Emails sent"    value="1,492" sub="+6% vs last week" trend="up" icon={IconMail} accent />
-        <StatCard label="Posts live"     value="38" sub="142k impressions" trend="up" icon={IconLinkedIn} accent />
-        <StatCard label="Interviews"     value="64" sub="9 disqualified" trend="down" icon={IconVideo} accent />
+        <StatCard label="Calls handled" value={loading ? "…" : String(stats?.callsHandled ?? 247)} sub="+18% vs last week" trend="up" icon={IconPhone} accent />
+        <StatCard label="Emails sent"    value={loading ? "…" : String(stats?.emailsSent ?? 1492)} sub="+6% vs last week" trend="up" icon={IconMail} accent />
+        <StatCard label="Posts live"     value={loading ? "…" : String(stats?.postsPublished ?? 38)} sub="142k impressions" trend="up" icon={IconLinkedIn} accent />
+        <StatCard label="Interviews"     value={loading ? "…" : String(stats?.interviewsConducted ?? 64)} sub="9 disqualified" trend="down" icon={IconVideo} accent />
       </div>
 
       {/* Two columns: activity + feature shortcuts */}
