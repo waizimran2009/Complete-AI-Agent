@@ -423,4 +423,4 @@ function LaunchScreen({ onEnter }) {
   );
 }
 
-Object.assign(window, { LaunchScreen });
+Object.assign(window, { LaunchScreen, QuantumOrb3D });

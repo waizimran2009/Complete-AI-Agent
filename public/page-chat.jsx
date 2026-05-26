@@ -1,512 +1,534 @@
-/* ─── QuantuMania Chat — Aria AI co-worker ─────────────────────
-   Keeps existing app layout & card design.
-   Premium features: markdown, editing, spinning input border,
-   suggestion pills, voice input, copy buttons.
-   API: window.ariaChat(message, history) → Promise<string>
+/* ─── QuantuMania Premium Chatbot ────────────────────────────────
+   Converted from PremiumChatbot.tsx — no TypeScript, no Tailwind.
+   Uses window.QuantumOrb3D (exported from launch-screen.jsx)
+   Uses window.ariaChat(message, history) → Promise<string>
    ─────────────────────────────────────────────────────────────── */
 
-const CHAT_CSS = `
-  @keyframes chatSpinBorder {
-    0%   { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  @keyframes chatSpinBorderRev {
-    0%   { transform: rotate(0deg); }
-    100% { transform: rotate(-360deg); }
-  }
-  @keyframes chatGlowPulse {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(var(--accent), 0.3), 0 0 20px rgba(var(--accent), 0.15); }
-    50%       { box-shadow: 0 0 0 1px rgba(var(--accent), 0.5), 0 0 36px rgba(var(--accent), 0.3); }
-  }
-  @keyframes chatOrbPulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(var(--accent), 0.5); }
-    50%       { box-shadow: 0 0 22px rgba(var(--accent), 0.8), 0 0 40px rgba(var(--accent), 0.4); }
-  }
-  @keyframes chatTypingDot {
-    0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
-    40%            { transform: scale(1);   opacity: 1; }
-  }
-  @keyframes chatMsgIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes chatFadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .chat-msg-in     { animation: chatMsgIn 0.3s ease forwards; }
-  .chat-fade-in    { animation: chatFadeIn 0.5s ease forwards; }
-  .chat-fade-d1    { animation: chatFadeIn 0.5s 0.1s ease forwards; opacity: 0; }
-  .chat-fade-d2    { animation: chatFadeIn 0.5s 0.22s ease forwards; opacity: 0; }
-  .chat-fade-d3    { animation: chatFadeIn 0.5s 0.36s ease forwards; opacity: 0; }
-  .chat-dot        { animation: chatTypingDot 1.2s infinite; }
-  .chat-dot:nth-child(2) { animation-delay: 0.2s; }
-  .chat-dot:nth-child(3) { animation-delay: 0.4s; }
-  .chat-scroll::-webkit-scrollbar { width: 4px; }
-  .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-  .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-  .chat-action-btns { opacity: 0; transition: opacity 0.15s ease; }
-  .chat-user-msg:hover .chat-action-btns { opacity: 1; }
-`;
+const THEME = {
+  primary:    "#8b5cf6",
+  secondary:  "#6366f1",
+  accent:     "#06b6d4",
+  userBubble: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+  aiBorder:   "rgba(99,102,241,0.2)",
+  aiText:     "#818cf8",
+  bg:         "#050308",
+};
 
-const QUICK_PROMPTS = [
-  { I: IconMail,      label: "Draft an email to a customer about our SOC2 cert" },
-  { I: IconLinkedIn,  label: "Write a LinkedIn post about our latest product" },
-  { I: IconBriefcase, label: "Help me reject a candidate politely" },
-  { I: IconUsers,     label: "Summarize today's interview scores" },
-  { I: IconPhone,     label: "What did the last caller want?" },
-  { I: IconBarChart,  label: "How's our hiring funnel performing?" },
+const SUGGESTION_PILLS = [
+  { Icon: IconSparkles, label: "Any advice for me?" },
+  { Icon: IconMail,     label: "Draft a client email" },
+  { Icon: IconUsers,    label: "Summarize today's interviews" },
 ];
 
-// ── ChatPage ──────────────────────────────────────────────────────────────────
+const FEMALE_VOICES = [
+  "Samantha","Karen","Victoria","Moira","Fiona",
+  "Google UK English Female","Microsoft Aria Online (Natural)",
+  "Microsoft Jenny Online (Natural)","Microsoft Zira","Google US English",
+];
+const MALE_VOICES = [
+  "Google UK English Male","Microsoft Guy Online (Natural)",
+  "Microsoft Mark Online (Natural)","Microsoft David Online (Natural)",
+  "Daniel","Oliver","Thomas","Alex","Fred","Google US English Male",
+];
+
+function cleanForSpeech(text) {
+  text = text.replace(/[\u{1F000}-\u{1FFFF}]/gu, "");
+  text = text.replace(/[\u{2300}-\u{27BF}]/gu, "");
+  text = text.replace(/^#{1,6}\s+/gm, "");
+  text = text.replace(/\*{1,3}([^*\n]*)\*{1,3}/g, "$1");
+  text = text.replace(/_{1,2}([^_\n]*)_{1,2}/g, "$1");
+  text = text.replace(/```[\s\S]*?```/g, "");
+  text = text.replace(/`[^`]*`/g, "");
+  text = text.replace(/^[-*_]{3,}\s*$/gm, ".");
+  text = text.replace(/^\s*[-*+>]\s+/gm, "");
+  text = text.replace(/^\s*\d+[.)]\s+/gm, "");
+  text = text.replace(/[♂♀✦★☆⚡◆▸▶→←↑↓•·–—|\\/<>[\]{}@#$%^&]/g, " ");
+  text = text.replace(/[*#_~]/g, "");
+  text = text.replace(/\n{2,}/g, ". ");
+  text = text.replace(/\n/g, " ");
+  text = text.replace(/\.{2,}/g, ".");
+  text = text.replace(/\s{2,}/g, " ");
+  return text.trim();
+}
+
+const CHAT_STYLES = `
+  @keyframes subtleFade   { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
+  @keyframes orbFloat     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+  @keyframes orbRing      { 0%{transform:scale(1);opacity:.85} 100%{transform:scale(1.9);opacity:0} }
+  @keyframes orbRing2     { 0%{transform:scale(1);opacity:.5}  100%{transform:scale(1.55);opacity:0} }
+  @keyframes typingDot    { 0%,80%,100%{transform:scale(.7);opacity:.4} 40%{transform:scale(1);opacity:1} }
+  @keyframes voiceRing    { 0%{transform:scale(1);opacity:.7}  100%{transform:scale(2.6);opacity:0} }
+  @keyframes voiceRing2   { 0%{transform:scale(1);opacity:.5}  100%{transform:scale(2.2);opacity:0} }
+  @keyframes voiceRing3   { 0%{transform:scale(1);opacity:.35} 100%{transform:scale(1.8);opacity:0} }
+  @keyframes voiceRing4   { 0%{transform:scale(1);opacity:.25} 100%{transform:scale(1.5);opacity:0} }
+  @keyframes orbVoicePulse{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+  @keyframes waveBar      { 0%,100%{transform:scaleY(.25);opacity:.4} 50%{transform:scaleY(1);opacity:1} }
+  @keyframes voiceOverlayIn{ 0%{opacity:0} 100%{opacity:1} }
+  @keyframes voiceOrbIn   { 0%{opacity:0;transform:scale(.7)} 100%{opacity:1;transform:scale(1)} }
+  @keyframes statusDot    { 0%,80%,100%{opacity:.2;transform:translateY(0)} 40%{opacity:1;transform:translateY(-3px)} }
+  @keyframes borderSpin   { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+  @keyframes borderSpinRev{ 0%{transform:rotate(0deg)} 100%{transform:rotate(-360deg)} }
+  @keyframes goldPulse    { 0%,100%{box-shadow:0 0 18px rgba(251,191,36,.25),0 0 40px rgba(245,158,11,.1)} 50%{box-shadow:0 0 30px rgba(251,191,36,.5),0 0 70px rgba(245,158,11,.25)} }
+  @keyframes shimmer      { 0%{background-position:-200% center} 100%{background-position:200% center} }
+  @keyframes pingDot      { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(2.2);opacity:0} }
+  .pc-fade-in    { animation:subtleFade .6s ease forwards; }
+  .pc-fade-d1    { animation:subtleFade .6s ease .1s  forwards; opacity:0; }
+  .pc-fade-d2    { animation:subtleFade .6s ease .2s  forwards; opacity:0; }
+  .pc-fade-d3    { animation:subtleFade .6s ease .35s forwards; opacity:0; }
+  .pc-fade-d4    { animation:subtleFade .6s ease .5s  forwards; opacity:0; }
+  .pc-msg-in     { animation:subtleFade .35s ease forwards; }
+  .pc-typing-dot { animation:typingDot 1.2s infinite; }
+  .pc-typing-dot:nth-child(2){ animation-delay:.2s; }
+  .pc-typing-dot:nth-child(3){ animation-delay:.4s; }
+  .pc-voice-ring-1{ animation:voiceRing  2.4s ease-out infinite; }
+  .pc-voice-ring-2{ animation:voiceRing2 2.4s ease-out .5s infinite; }
+  .pc-voice-ring-3{ animation:voiceRing3 2.4s ease-out 1s infinite; }
+  .pc-voice-ring-4{ animation:voiceRing4 2.4s ease-out 1.5s infinite; }
+  .pc-orb-voice  { animation:orbVoicePulse 1.8s ease-in-out infinite; }
+  .pc-status-dot { animation:statusDot 1.4s ease-in-out infinite; }
+  .pc-status-dot:nth-child(2){ animation-delay:.2s; }
+  .pc-status-dot:nth-child(3){ animation-delay:.4s; }
+  .pc-ping       { animation:pingDot 1.2s ease-out infinite; }
+  .pc-shimmer    {
+    background:linear-gradient(90deg,#fbbf24,#f59e0b,#fde68a,#f59e0b,#fbbf24);
+    background-size:200% auto; -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent; background-clip:text;
+    animation:shimmer 2.5s linear infinite;
+  }
+  .pc-scroll::-webkit-scrollbar{ width:4px; }
+  .pc-scroll::-webkit-scrollbar-track{ background:transparent; }
+  .pc-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.1); border-radius:4px; }
+  .pc-user-msg .pc-msg-actions{ opacity:0; transition:opacity .15s ease; }
+  .pc-user-msg:hover .pc-msg-actions{ opacity:1; }
+`;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ChatPage
+// ══════════════════════════════════════════════════════════════════════════════
 function ChatPage() {
-  const [messages,    setMessages]    = React.useState([]);
-  const [input,       setInput]       = React.useState("");
-  const [thinking,    setThinking]    = React.useState(false);
-  const [aiActive,    setAiActive]    = React.useState(false);
-  const [editingId,   setEditingId]   = React.useState(null);
-  const [editingText, setEditingText] = React.useState("");
-  const scrollRef = React.useRef(null);
+  const beatRef            = React.useRef({ intensity: 0 });
+  const [inputVal,         setInputVal]         = React.useState("");
+  const [beatPulse,        setBeatPulse]         = React.useState(0);
+  const [messages,         setMessages]          = React.useState([]);
+  const [isTyping,         setIsTyping]          = React.useState(false);
+  const [chatOpen,         setChatOpen]          = React.useState(false);
+  const [voiceOrbOpen,     setVoiceOrbOpen]      = React.useState(false);
+  const [wakewordReady,    setWakewordReady]     = React.useState(false);
+  const voiceOrbOpenRef    = React.useRef(false);
+  const wakewordRecRef     = React.useRef(null);
+  const wakewordPausedRef  = React.useRef(false);
+  const bottomRef          = React.useRef(null);
+
+  React.useEffect(() => { voiceOrbOpenRef.current = voiceOrbOpen; }, [voiceOrbOpen]);
+
+  // Wakeword: "Hey Quantum" opens voice orb
+  React.useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR || voiceOrbOpen) {
+      setWakewordReady(false);
+      if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} wakewordRecRef.current = null; }
+      return;
+    }
+    let destroyed = false;
+    function isWakeword(t) {
+      const s = t.toLowerCase().trim();
+      return s.includes("hey quantum") || s.includes("ok quantum") || s.includes("hi quantum") || s.includes("quantum");
+    }
+    function start() {
+      if (destroyed) return;
+      try {
+        const rec = new SR();
+        wakewordRecRef.current = rec;
+        rec.continuous = false; rec.interimResults = false; rec.lang = "en-US"; rec.maxAlternatives = 5;
+        rec.onstart = () => { if (!destroyed) setWakewordReady(true); };
+        rec.onresult = (e) => {
+          if (destroyed) return;
+          for (let i = 0; i < e.results.length; i++)
+            for (let j = 0; j < e.results[i].length; j++)
+              if (isWakeword(e.results[i][j].transcript)) { setVoiceOrbOpen(true); return; }
+        };
+        rec.onend = () => { if (!destroyed && !wakewordPausedRef.current) setTimeout(start, 250); };
+        rec.onerror = (e) => {
+          if (e.error === "not-allowed" || e.error === "service-not-allowed") { destroyed = true; setWakewordReady(false); return; }
+          if (!destroyed && !wakewordPausedRef.current) setTimeout(start, 1500);
+        };
+        rec.start();
+      } catch { if (!destroyed) setTimeout(start, 2000); }
+    }
+    start();
+    return () => {
+      destroyed = true; setWakewordReady(false);
+      if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} wakewordRecRef.current = null; }
+    };
+  }, [voiceOrbOpen]);
+
+  const stopSpeaking = React.useCallback(() => { window.speechSynthesis?.cancel(); }, []);
 
   React.useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, thinking]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
-  async function send(text, priorMessages) {
-    const userText = (typeof text === "string" ? text : input).trim();
-    if (!userText || thinking) return;
-    setInput("");
+  function triggerBeat() { beatRef.current.intensity = 1.0; setBeatPulse(p => p + 1); }
 
-    const base = priorMessages !== undefined ? priorMessages : messages;
-    const newMessages = [...base, { who: "user", text: userText, id: Date.now() }];
-    setMessages(newMessages);
-    setThinking(true);
-    setAiActive(true);
+  async function sendMessage(text) {
+    const trimmed = text.trim();
+    if (!trimmed || isTyping) return;
+
+    const uid = Date.now();
+    const newMsgs = [...messages, { role: "user", text: trimmed, id: uid }];
+    setMessages(newMsgs);
+    setChatOpen(true);
+    triggerBeat();
+    setInputVal("");
+    setIsTyping(true);
 
     try {
-      const history = newMessages.slice(0, -1).map(m => ({
-        role: m.who === "user" ? "user" : "model",
+      const history = newMsgs.slice(0, -1).map(m => ({
+        role: m.role === "user" ? "user" : "model",
         content: m.text,
       }));
-      const reply = await window.ariaChat(userText, history);
-      setMessages(prev => [...prev, { who: "ai", text: reply.trim(), id: Date.now() + 1 }]);
-    } catch (e) {
-      setMessages(prev => [...prev, { who: "ai", text: "Couldn't reach the neural net — try again in a moment.", id: Date.now() + 1, error: true }]);
+      const reply = await window.ariaChat(trimmed, history);
+      setMessages(prev => [...prev, { role: "ai", text: reply.trim(), id: uid + 1 }]);
+      triggerBeat();
+    } catch {
+      setMessages(prev => [...prev, { role: "ai", text: "Sorry, something went wrong. Please try again.", id: uid + 1 }]);
+    } finally {
+      setIsTyping(false);
     }
-    setThinking(false);
-    setAiActive(false);
   }
 
-  function handleEditSave(id) {
-    const trimmed = editingText.trim();
-    if (!trimmed) { setEditingId(null); return; }
-    const idx = messages.findIndex(m => m.id === id);
-    const prior = idx === -1 ? messages : messages.slice(0, idx);
-    setEditingId(null);
-    setEditingText("");
-    send(trimmed, prior);
-  }
-
-  const chatStarted = messages.length > 0;
+  const handleSend = () => sendMessage(inputVal);
 
   return (
-    <div style={{
-      padding: 24,
-      display: "grid",
-      gridTemplateColumns: "1.4fr 320px",
-      gap: 16,
-      height: "calc(100vh - 64px)",
-      overflow: "hidden",
-    }}>
-      <style>{CHAT_CSS}</style>
+    <div style={{ display: "flex", height: "calc(100vh - 64px)", width: "100%", color: "white", fontFamily: "var(--font-sans)", overflow: "hidden", position: "relative", background: THEME.bg }}>
+      <style>{CHAT_STYLES}</style>
+      <PremiumCanvas />
 
-      {/* ── Left: chat stage ── */}
-      <div className="card card-glow" style={{ display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-        <div className="grid-bg" />
+      {/* ── Top bar ── */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", zIndex: 20 }}>
+        <div>
+          {chatOpen && (
+            <button
+              onClick={() => { setChatOpen(false); setMessages([]); }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.05)", color: "#9ca3af", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              <IconPlus size={12} /> New chat
+            </button>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, border: "1px solid rgba(251,191,36,0.4)", background: "linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.1))", animation: "goldPulse 3s ease-in-out infinite" }}>
+          <span style={{ fontSize: 13, color: "#f59e0b" }}>♛</span>
+          <span className="pc-shimmer" style={{ fontSize: 13, fontWeight: 700 }}>Premium</span>
+        </div>
+      </div>
 
-        {/* Header */}
-        <div className="card-header" style={{ position: "relative", zIndex: 1 }}>
-          <div className="row gap-3">
-            <AriaOrb size={36} active={aiActive} />
-            <div className="col" style={{ gap: 0 }}>
-              <div className="row gap-2">
-                <h3 className="h3" style={{ margin: 0 }}>Aria</h3>
-                <span className="pill pill-success" style={{ height: 20 }}>
-                  <span className="dot dot-success" style={{ animation: "pulse-soft 1.6s infinite" }} />
-                  {aiActive ? "Thinking" : "Online"}
-                </span>
-              </div>
-              <span style={{ fontSize: 10.5, color: "var(--fg-3)", letterSpacing: "0.06em" }}>
-                Quantum core · v4.2 · Groq + Cloudflare
+      {/* ── Landing view ── */}
+      {!chatOpen && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px", position: "relative" }}>
+          <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle,rgba(99,102,241,0.12) 0%,transparent 70%)", top: "50%", left: "50%", transform: "translate(-50%,-62%)", pointerEvents: "none" }} />
+
+          <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={160} floats />
+
+          <div className="pc-fade-d1" style={{ textAlign: "center", marginBottom: 12, marginTop: 0 }}>
+            <div style={{ fontSize: 28, fontWeight: 300, color: "#d1d5db", marginBottom: 4 }}>Good to See You!</div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: "white" }}>
+              How Can I <span style={{ fontWeight: 700, fontStyle: "italic" }}>Help</span> You Today?
+            </div>
+          </div>
+
+          <p className="pc-fade-d2" style={{ fontSize: 13, color: "#6b7280", marginBottom: 48, textAlign: "center" }}>
+            I'm available 24/7 for you, ask me anything.
+          </p>
+
+          <div className="pc-fade-d3" style={{ width: "100%", maxWidth: 576 }}>
+            <InputCard
+              inputVal={inputVal}
+              setInputVal={setInputVal}
+              onSend={handleSend}
+              onMic={() => setVoiceOrbOpen(true)}
+              onVoiceInputStart={() => { wakewordPausedRef.current = true; if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} } setWakewordReady(false); }}
+              onVoiceInputEnd={() => { wakewordPausedRef.current = false; }}
+            />
+          </div>
+
+          <div className="pc-fade-d4" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 576, marginTop: 16 }}>
+            {SUGGESTION_PILLS.map(p => (
+              <SuggestionPill key={p.label} Icon={p.Icon} label={p.label} onClick={() => sendMessage(p.label)} />
+            ))}
+          </div>
+
+          {wakewordReady && (
+            <div className="pc-fade-d4" style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 999, background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.15)" }}>
+              <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8 }}>
+                <span className="pc-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(167,139,250,0.6)" }} />
+                <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8, borderRadius: "50%", background: "#8b5cf6" }} />
+              </span>
+              <span style={{ fontSize: 11, color: "#6b7280", letterSpacing: "0.04em" }}>
+                Say <span style={{ color: "#a78bfa", fontWeight: 500 }}>"Hey Quantum"</span> to open voice
               </span>
             </div>
-          </div>
-          <div className="row gap-2">
-            <button className="btn btn-sm btn-ghost" onClick={() => setMessages([])}><IconPlus size={13} />New chat</button>
+          )}
+
+          <div style={{ position: "absolute", bottom: 20, left: 0, right: 0, textAlign: "center", fontSize: 11, color: "#374151" }}>
+            Unlock new era with QuantuMania.
           </div>
         </div>
+      )}
 
-        {/* ── Landing (no messages yet) ── */}
-        {!chatStarted && (
-          <div className="col" style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32, position: "relative", zIndex: 1, gap: 0 }}>
-            <div className="chat-fade-in" style={{ marginBottom: 24 }}>
-              <AriaOrb size={100} active={false} pulse />
-            </div>
-            <div className="chat-fade-d1" style={{ textAlign: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 22, fontWeight: 300, color: "var(--fg-2)", marginBottom: 4 }}>Good to see you.</div>
-              <div style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-1)" }}>How can I <em style={{ fontStyle: "italic" }}>help</em> you today?</div>
-            </div>
-            <div className="chat-fade-d2" style={{ fontSize: 12.5, color: "var(--fg-3)", marginBottom: 32, textAlign: "center" }}>
-              I'm available 24/7 — ask me anything about your company.
-            </div>
-            <div className="chat-fade-d3" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 480, marginBottom: 32 }}>
-              {["Draft an email to a client", "Summarize today's interviews", "Write a LinkedIn post"].map(label => (
-                <button
-                  key={label}
-                  onClick={() => send(label)}
-                  style={{
-                    padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 500,
-                    background: "rgba(var(--accent), 0.08)",
-                    border: "1px solid rgba(var(--accent), 0.25)",
-                    color: "rgb(var(--accent-3))",
-                    cursor: "pointer", transition: "all 0.2s ease",
-                    fontFamily: "inherit",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(var(--accent), 0.15)"; e.currentTarget.style.borderColor = "rgba(var(--accent), 0.5)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(var(--accent), 0.08)"; e.currentTarget.style.borderColor = "rgba(var(--accent), 0.25)"; }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="chat-fade-d3" style={{ width: "100%", maxWidth: 520 }}>
-              <ChatInput value={input} onChange={setInput} onSend={() => send()} />
-            </div>
+      {/* ── Chat view ── */}
+      {chatOpen && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingTop: 64, overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "center", paddingTop: 16, paddingBottom: 8, flexShrink: 0 }}>
+            <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={72} />
           </div>
-        )}
 
-        {/* ── Chat messages ── */}
-        {chatStarted && (
-          <>
-            <div ref={scrollRef} className="chat-scroll" style={{ flex: 1, padding: "20px 24px", overflowY: "auto", position: "relative", zIndex: 1 }}>
-              <div className="col gap-4">
-                {messages.map(m => (
-                  <ChatMessage
-                    key={m.id}
-                    m={m}
-                    editingId={editingId}
-                    editingText={editingText}
-                    setEditingId={setEditingId}
-                    setEditingText={setEditingText}
-                    onEditSave={handleEditSave}
-                  />
-                ))}
-                {thinking && (
-                  <div className="row gap-3 chat-msg-in" style={{ alignItems: "flex-start" }}>
-                    <AriaOrb size={28} active={true} />
-                    <div style={{
-                      padding: "10px 14px",
-                      background: "rgba(var(--accent), 0.06)",
-                      border: "1px solid rgba(var(--accent), 0.18)",
-                      borderRadius: 12,
-                      display: "flex", gap: 5, alignItems: "center",
-                    }}>
-                      {[0, 1, 2].map(j => (
-                        <span key={j} className="chat-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "rgb(var(--accent-3))", display: "inline-block" }} />
-                      ))}
+          <div className="pc-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 768, margin: "0 auto", boxSizing: "border-box" }}>
+            {messages.map(msg => (
+              <div key={msg.id} className="pc-msg-in" style={{ display: "flex", gap: 12, flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
+                {msg.role === "ai" && (
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${THEME.primary}22`, border: `1px solid ${THEME.primary}44`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                    <IconSparkles size={14} style={{ color: THEME.primary }} />
+                  </div>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "80%" }}>
+                  {msg.role === "user" ? (
+                    <div className="pc-user-msg" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      <div style={{ padding: "10px 16px", borderRadius: 16, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.6, background: THEME.userBubble, boxShadow: "0 4px 20px rgba(99,102,241,0.25)", whiteSpace: "pre-wrap" }}>
+                        {msg.text}
+                      </div>
+                      <div className="pc-msg-actions" style={{ display: "flex", gap: 4 }}>
+                        <PCCopyButton text={msg.text} />
+                      </div>
                     </div>
+                  ) : (
+                    <div style={{ borderRadius: 16, borderTopLeftRadius: 4, overflow: "hidden", background: "#ffffff", border: `1px solid ${THEME.aiBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderBottom: "1px solid rgba(0,0,0,0.07)", background: `${THEME.primary}18` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: THEME.primary }}>✦ QuantuMania AI</span>
+                        </div>
+                        <PCCopyButton text={msg.text} color={THEME.primary} />
+                      </div>
+                      <div style={{ padding: "14px 16px", background: "#ffffff" }}>
+                        <PCMarkdown text={msg.text} accentColor={THEME.primary} primaryColor={THEME.primary} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {msg.role === "user" && (
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2, fontSize: 11, fontWeight: 600, color: "#9ca3af" }}>
+                    ME
                   </div>
                 )}
               </div>
-            </div>
-
-            <div style={{ padding: "12px 18px 18px", borderTop: "1px solid var(--hairline)", position: "relative", zIndex: 1 }}>
-              <ChatInput value={input} onChange={setInput} onSend={() => send()} />
-              <div className="row" style={{ marginTop: 8, justifyContent: "space-between", fontSize: 10.5, color: "var(--fg-3)" }}>
-                <span>↵ to send · ⇧↵ for new line</span>
-                <span>Aria v4.2 · Groq + Cloudflare</span>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Right: quick actions ── */}
-      <div className="col gap-4" style={{ overflowY: "auto" }}>
-        <div className="card">
-          <div className="card-header">
-            <h3 className="h3">Quick prompts</h3>
-            <IconSparkles size={14} style={{ color: "rgb(var(--accent-3))" }} />
-          </div>
-          <div className="col" style={{ padding: 6 }}>
-            {QUICK_PROMPTS.map((p, i) => (
-              <button
-                key={i}
-                onClick={() => send(p.label)}
-                style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "transparent", border: "none", borderRadius: "var(--r-sm)", color: "var(--fg-2)", fontSize: 12.5, fontFamily: "inherit", textAlign: "left", lineHeight: 1.45, cursor: "pointer", transition: "background 0.15s ease" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(var(--accent), 0.06)"; e.currentTarget.style.color = "var(--fg-1)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-2)"; }}
-              >
-                <p.I size={14} style={{ color: "rgb(var(--accent-3))", marginTop: 2, flexShrink: 0 }} />
-                <span style={{ flex: 1 }}>{p.label}</span>
-              </button>
             ))}
-          </div>
-        </div>
 
-        <div className="card">
-          <div className="card-header"><h3 className="h3">Aria can access</h3></div>
-          <div className="col" style={{ padding: 4 }}>
-            {[
-              { I: IconMail,      label: "Email automation",  note: "Active" },
-              { I: IconPhone,     label: "Call automation",   note: "Active" },
-              { I: IconUsers,     label: "ATS & Interviews",  note: "Active" },
-              { I: IconCalendar,  label: "Leave management",  note: "Active" },
-              { I: IconBarChart,  label: "HR Analytics",      note: "Live"   },
-              { I: IconBriefcase, label: "Job postings",      note: "Active" },
-            ].map((c, i) => (
-              <div key={i} className="row gap-3" style={{ padding: "8px 12px", borderTop: i > 0 ? "1px solid var(--hairline)" : "none" }}>
-                <c.I size={14} style={{ color: "rgb(var(--accent-3))", flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: 12, color: "var(--fg-1)" }}>{c.label}</span>
-                <span style={{ fontSize: 10.5, color: "var(--fg-3)" }}>{c.note}</span>
-                <span className="dot dot-success" />
+            {isTyping && (
+              <div className="pc-msg-in" style={{ display: "flex", gap: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                  <IconSparkles size={13} style={{ color: "#818cf8" }} />
+                </div>
+                <div style={{ background: "#141418", border: "1px solid rgba(255,255,255,0.07)", padding: "12px 16px", borderRadius: 16, borderTopLeftRadius: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
+                  <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
+                  <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
+                </div>
               </div>
-            ))}
+            )}
+            <div ref={bottomRef} />
           </div>
-        </div>
 
-        <div className="card" style={{ background: "linear-gradient(180deg, rgba(var(--accent), 0.05), rgba(255,255,255,0.01))", border: "1px solid rgba(var(--accent), 0.2)" }}>
-          <div className="card-body" style={{ padding: 16 }}>
-            <div className="label-accent" style={{ marginBottom: 8 }}>Aria's notes</div>
-            <div style={{ fontSize: 12.5, color: "var(--fg-2)", lineHeight: 1.55 }}>
-              All 9 AI co-worker features are active. Use the sidebar to navigate between Email, Calls, Posts, ATS, Interviews, Attendance, Leave, and Analytics.
-            </div>
-            <button className="btn btn-sm" style={{ marginTop: 12 }} onClick={() => send("What are all the features in this system and how can I use them?")}>
-              <IconSparkles size={12} />Show me the features
-            </button>
+          <div style={{ flexShrink: 0, padding: "0 24px 24px", maxWidth: 768, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+            <InputCard
+              inputVal={inputVal}
+              setInputVal={setInputVal}
+              onSend={handleSend}
+              onMic={() => setVoiceOrbOpen(true)}
+              onVoiceInputStart={() => { wakewordPausedRef.current = true; if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} } setWakewordReady(false); }}
+              onVoiceInputEnd={() => { wakewordPausedRef.current = false; }}
+            />
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── Voice Orb Overlay ── */}
+      {voiceOrbOpen && (
+        <AIVoiceOrbOverlay
+          beatRef={beatRef}
+          beatPulse={beatPulse}
+          onClose={() => { stopSpeaking(); setVoiceOrbOpen(false); }}
+        />
+      )}
     </div>
   );
 }
 
-// ── AriaOrb — CSS accent-colored orb ─────────────────────────────────────────
-function AriaOrb({ size, active, pulse }) {
+// ── OrbWrapper ────────────────────────────────────────────────────────────────
+function OrbWrapper({ beatPulse, beatRef, size, floats }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%", flexShrink: 0,
-      background: `radial-gradient(circle at 35% 30%, rgba(var(--accent-3), 0.95), rgba(var(--accent), 0.75) 50%, rgba(var(--accent-2), 0.35) 80%, transparent)`,
-      boxShadow: active
-        ? `0 0 ${size * 0.5}px rgba(var(--accent), 0.7), 0 0 ${size}px rgba(var(--accent), 0.35)`
-        : pulse
-          ? undefined
-          : `0 0 ${size * 0.25}px rgba(var(--accent), 0.35)`,
-      animation: active ? "chatOrbPulse 1.2s ease-in-out infinite" : pulse ? "chatOrbPulse 2.8s ease-in-out infinite" : "none",
-      transition: "box-shadow 0.3s ease",
-    }} />
+    <div
+      className="pc-fade-in"
+      style={{
+        position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
+        width: size, height: size,
+        animation: floats
+          ? "subtleFade .6s ease forwards, orbFloat 3.5s ease-in-out infinite"
+          : "subtleFade .6s ease forwards",
+      }}
+    >
+      {beatPulse > 0 && (
+        <>
+          <div key={`r1-${beatPulse}`} style={{ position: "absolute", width: size, height: size, borderRadius: "50%", border: "2px solid rgba(167,139,250,0.85)", animation: "orbRing .75s cubic-bezier(.2,.6,.4,1) forwards", pointerEvents: "none" }} />
+          <div key={`r2-${beatPulse}`} style={{ position: "absolute", width: size, height: size, borderRadius: "50%", border: "1.5px solid rgba(99,102,241,0.55)", animation: "orbRing2 .6s cubic-bezier(.2,.6,.4,1) .08s forwards", pointerEvents: "none" }} />
+        </>
+      )}
+      <QuantumOrb3D size={size} beatRef={beatRef} />
+    </div>
   );
 }
 
-// ── ChatInput — spinning border ───────────────────────────────────────────────
-function ChatInput({ value, onChange, onSend }) {
-  const [listening, setListening] = React.useState(false);
-  const voiceRef = React.useRef(null);
+// ── InputCard ─────────────────────────────────────────────────────────────────
+function InputCard({ inputVal, setInputVal, onSend, onMic, onVoiceInputStart, onVoiceInputEnd }) {
+  const [isVoiceListening, setIsVoiceListening] = React.useState(false);
+  const voiceRecRef = React.useRef(null);
   const inputRef = React.useRef(null);
 
-  function toggleVoice() {
+  function toggleVoiceToText() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
-    if (listening) {
-      try { voiceRef.current?.stop(); } catch {}
-      voiceRef.current = null;
-      setListening(false);
-      return;
+    if (isVoiceListening) {
+      if (voiceRecRef.current) { try { voiceRecRef.current.stop(); } catch {} voiceRecRef.current = null; }
+      setIsVoiceListening(false); onVoiceInputEnd?.(); return;
     }
+    onVoiceInputStart?.();
     try {
-      const rec = new SR();
-      voiceRef.current = rec;
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = "en-US";
-      let final = value;
+      const rec = new SR(); voiceRecRef.current = rec;
+      rec.continuous = true; rec.interimResults = true; rec.lang = "en-US";
+      let finalText = inputVal;
       rec.onresult = (e) => {
         let interim = "", newFinal = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
+        for (let i = e.resultIndex; i < e.results.length; i++)
           if (e.results[i].isFinal) newFinal += e.results[i][0].transcript;
           else interim += e.results[i][0].transcript;
-        }
-        if (newFinal) { final = (final + " " + newFinal).trim(); onChange(final); }
-        else onChange((final + " " + interim).trim());
+        if (newFinal) { finalText = (finalText + " " + newFinal).trim(); setInputVal(finalText); }
+        else setInputVal((finalText + " " + interim).trim());
       };
-      rec.onerror = () => { setListening(false); voiceRef.current = null; };
-      rec.onend = () => { setListening(false); voiceRef.current = null; inputRef.current?.focus(); };
-      rec.start();
-      setListening(true);
-    } catch { setListening(false); }
+      rec.onerror = (e) => { if (e.error === "not-allowed") { setIsVoiceListening(false); voiceRecRef.current = null; onVoiceInputEnd?.(); } };
+      rec.onend = () => { setIsVoiceListening(false); voiceRecRef.current = null; onVoiceInputEnd?.(); inputRef.current?.focus(); };
+      rec.start(); setIsVoiceListening(true);
+    } catch { setIsVoiceListening(false); onVoiceInputEnd?.(); }
   }
 
   return (
-    <div style={{ position: "relative" }}>
-      {/* Spinning accent border */}
-      <div style={{ borderRadius: 14, padding: "1.5px", position: "relative" }}>
-        <div style={{ position: "absolute", inset: 0, borderRadius: 14, overflow: "hidden", pointerEvents: "none" }}>
-          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 0deg, transparent 0deg, rgba(var(--accent),0.85) 40deg, rgba(var(--accent-3),0.9) 80deg, transparent 140deg, transparent 200deg, rgba(var(--accent-2),0.7) 250deg, rgba(var(--accent),0.85) 290deg, transparent 330deg)", animation: "chatSpinBorder 4s linear infinite" }} />
+    <div style={{ width: "100%", maxWidth: 576, margin: "0 auto" }}>
+      <div style={{ position: "relative", borderRadius: 16, padding: "1.5px" }}>
+        {/* Spinning gold border */}
+        <div style={{ position: "absolute", inset: 0, borderRadius: 16, overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 0deg,transparent 0deg,rgba(251,191,36,.9) 40deg,rgba(245,158,11,1) 80deg,rgba(253,230,138,.8) 120deg,transparent 160deg,transparent 200deg,rgba(245,158,11,.7) 240deg,rgba(251,191,36,.9) 280deg,transparent 320deg)", animation: "borderSpin 3.5s linear infinite" }} />
         </div>
-        <div style={{ position: "absolute", inset: 0, borderRadius: 14, overflow: "hidden", pointerEvents: "none" }}>
-          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 180deg, transparent 0deg, rgba(var(--accent-2),0.45) 60deg, rgba(var(--accent),0.35) 100deg, transparent 140deg)", animation: "chatSpinBorderRev 6s linear infinite" }} />
+        <div style={{ position: "absolute", inset: 0, borderRadius: 16, overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 180deg,transparent 0deg,rgba(168,85,247,.5) 50deg,rgba(251,191,36,.4) 90deg,transparent 130deg)", animation: "borderSpinRev 5.5s linear infinite" }} />
         </div>
-        <div style={{ position: "absolute", inset: 0, borderRadius: 14, pointerEvents: "none", animation: "chatGlowPulse 3s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", inset: 0, borderRadius: 16, pointerEvents: "none", boxShadow: "0 0 20px 3px rgba(251,191,36,.3),0 0 50px 6px rgba(245,158,11,.15)", animation: "goldPulse 3s ease-in-out infinite" }} />
 
-        <div style={{
-          display: "flex", gap: 8, background: "var(--bg-elev-1)",
-          borderRadius: 13, padding: "4px 4px 4px 14px",
-          position: "relative",
-        }}>
-          <textarea
-            ref={inputRef}
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
-            }}
-            placeholder={listening ? "Listening…" : "Ask Aria anything — emails, posts, candidates, analytics…"}
-            rows={1}
-            style={{
-              flex: 1, background: "transparent", border: "none", outline: "none",
-              color: "var(--fg-1)", fontFamily: "inherit", fontSize: 13.5,
-              padding: "10px 0", resize: "none", minHeight: 24, maxHeight: 100, lineHeight: 1.5,
-            }}
-          />
-          <div className="row gap-1" style={{ alignItems: "center", padding: 4 }}>
-            <button
-              className={`btn btn-icon btn-sm ${listening ? "btn-primary" : "btn-ghost"}`}
-              onClick={toggleVoice}
-              title={listening ? "Stop" : "Voice input"}
-            >
-              <IconMic size={14} />
-            </button>
-            <button
-              className="btn btn-icon btn-sm"
-              onClick={onSend}
-              disabled={!value.trim()}
-              style={{
-                background: value.trim() ? "linear-gradient(180deg, rgb(var(--accent)), rgb(var(--accent-2)))" : "var(--bg-elev-2)",
-                color: value.trim() ? "white" : "var(--fg-3)",
-                borderColor: value.trim() ? "rgba(var(--accent), 0.5)" : "var(--hairline)",
-                boxShadow: value.trim() ? "0 4px 16px -4px rgba(var(--accent), 0.6)" : "none",
-              }}
-            >
-              <IconSend size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── ChatMessage ───────────────────────────────────────────────────────────────
-function ChatMessage({ m, editingId, editingText, setEditingId, setEditingText, onEditSave }) {
-  if (m.who === "ai") {
-    return (
-      <div className="row gap-3 chat-msg-in" style={{ alignItems: "flex-start" }}>
-        <AriaOrb size={28} active={false} />
-        <div style={{ maxWidth: "78%" }}>
-          <div style={{
-            background: "white",
-            border: "1px solid rgba(var(--accent), 0.12)",
-            borderRadius: 14, borderTopLeftRadius: 4,
-            overflow: "hidden",
-            boxShadow: m.error ? "none" : "0 2px 12px rgba(0,0,0,0.15)",
-          }}>
-            <div style={{ padding: "6px 12px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(var(--accent), 0.04)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: m.error ? "rgb(var(--danger))" : "rgb(var(--accent))" }}>
-                ✦ Aria
-              </span>
-              {!m.error && <InlineCopyBtn text={m.text} />}
+        <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", background: "#0a0812" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid rgba(251,191,36,0.08)", background: "#0f0d14", fontSize: 11 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "#f59e0b", fontSize: 12 }}>♛</span>
+              <span style={{ color: "rgba(251,191,36,0.6)" }}>Premium AI · Groq + Cloudflare</span>
             </div>
-            <div style={{ padding: "12px 14px", background: "white" }}>
-              {m.error
-                ? <span style={{ fontSize: 13.5, color: "rgb(252,165,165)", lineHeight: 1.6 }}>{m.text}</span>
-                : <ChatMarkdown text={m.text} />
-              }
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", display: "inline-block" }} />
+              <span style={{ color: "rgba(251,191,36,0.5)" }}>Active</span>
             </div>
           </div>
-          <div style={{ fontSize: 10.5, color: "var(--fg-4)", marginTop: 4, marginLeft: 4 }}>Aria · just now</div>
-        </div>
-      </div>
-    );
-  }
-
-  /* User message */
-  return (
-    <div className="row gap-3 chat-msg-in chat-user-msg" style={{ alignItems: "flex-start", flexDirection: "row-reverse" }}>
-      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, rgba(var(--accent), 0.5), rgba(var(--accent-2), 0.5))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "white", flexShrink: 0, marginTop: 2 }}>ME</div>
-      <div style={{ maxWidth: "78%", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-        {editingId === m.id ? (
-          <div style={{ width: "100%", minWidth: 220 }}>
-            <textarea
-              autoFocus
-              value={editingText}
-              onChange={e => setEditingText(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onEditSave(m.id); }
-                if (e.key === "Escape") { setEditingId(null); setEditingText(""); }
-              }}
-              rows={Math.min(6, editingText.split("\n").length + 1)}
-              style={{ width: "100%", padding: "10px 14px", borderRadius: 14, fontSize: 13.5, lineHeight: 1.6, color: "var(--fg-1)", outline: "none", resize: "none", background: "var(--bg-elev-2)", border: "1px solid rgba(var(--accent), 0.4)", fontFamily: "inherit" }}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", background: "#0f0d14" }}>
+            <PCPlusBtn />
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputVal}
+              onChange={e => setInputVal(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") onSend(); }}
+              placeholder={isVoiceListening ? "Listening…" : "Ask anything…"}
+              style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "white", fontSize: 13.5, fontFamily: "inherit" }}
             />
-            <div className="row gap-2" style={{ marginTop: 6, justifyContent: "flex-end" }}>
-              <button className="btn btn-sm btn-ghost" onClick={() => { setEditingId(null); setEditingText(""); }}>Cancel</button>
-              <button className="btn btn-sm btn-primary" onClick={() => onEditSave(m.id)}><IconSend size={11} /> Send</button>
-            </div>
+            <button
+              onClick={toggleVoiceToText}
+              title={isVoiceListening ? "Stop" : "Voice to text"}
+              style={{ flexShrink: 0, padding: 6, borderRadius: 8, border: "none", cursor: "pointer", transition: "all .2s ease", background: isVoiceListening ? "rgba(239,68,68,.12)" : "transparent", color: isVoiceListening ? "#ef4444" : "rgba(251,191,36,0.6)", animation: isVoiceListening ? "goldPulse 1s ease-in-out infinite" : "none" }}
+            >
+              <IconMic size={17} />
+            </button>
+            <button
+              onClick={inputVal.trim() ? onSend : onMic}
+              title={inputVal.trim() ? "Send" : "Open voice assistant"}
+              style={{ flexShrink: 0, padding: 6, borderRadius: 8, border: "none", cursor: "pointer", background: "transparent", color: "#f59e0b", transition: "color .2s ease" }}
+            >
+              {inputVal.trim() ? <IconSend size={18} /> : <IconSparkles size={18} />}
+            </button>
           </div>
-        ) : (
-          <>
-            <div style={{ padding: "11px 15px", background: "rgba(var(--accent), 0.1)", border: "1px solid rgba(var(--accent), 0.22)", borderRadius: 14, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.6, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}>
-              {m.text}
-            </div>
-            <div className="chat-action-btns row gap-1">
-              <button
-                onClick={() => { setEditingId(m.id); setEditingText(m.text); }}
-                style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", fontSize: 10, borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "none", color: "var(--fg-3)", cursor: "pointer" }}
-              >
-                <IconZap size={9} /> Edit
-              </button>
-              <InlineCopyBtn text={m.text} />
-            </div>
-          </>
-        )}
-        <div style={{ fontSize: 10.5, color: "var(--fg-4)", marginRight: 4 }}>You · just now</div>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── InlineCopyBtn ─────────────────────────────────────────────────────────────
-function InlineCopyBtn({ text }) {
+function PCPlusBtn() {
+  const [hov, setHov] = React.useState(false);
+  return (
+    <button
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{ flexShrink: 0, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, cursor: "pointer", transition: "all .25s ease", background: hov ? "linear-gradient(135deg,rgba(124,58,237,.4),rgba(59,130,246,.35))" : "rgba(255,255,255,.04)", border: hov ? "1px solid rgba(167,139,250,.8)" : "1px solid rgba(167,139,250,.45)", color: hov ? "#c4b5fd" : "#a78bfa", boxShadow: hov ? "0 0 14px rgba(139,92,246,.7),0 0 30px rgba(59,130,246,.3)" : "0 0 8px rgba(139,92,246,.4)" }}
+    >
+      <IconPlus size={15} />
+    </button>
+  );
+}
+
+function SuggestionPill({ Icon, label, onClick }) {
+  const [hov, setHov] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 15px", borderRadius: 999, background: hov ? "linear-gradient(135deg,#7c3aed,#3b82f6)" : "linear-gradient(135deg,rgba(124,58,237,.55),rgba(59,130,246,.55))", border: hov ? "1px solid rgba(200,180,255,.8)" : "1px solid rgba(167,139,250,.55)", color: "white", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all .25s ease", whiteSpace: "nowrap", boxShadow: hov ? "0 0 18px rgba(139,92,246,.75)" : "0 0 10px rgba(139,92,246,.45)", fontFamily: "inherit" }}
+    >
+      <Icon size={13} style={{ color: "rgba(255,255,255,0.85)", flexShrink: 0 }} />
+      {label}
+    </button>
+  );
+}
+
+// ── Copy button ───────────────────────────────────────────────────────────────
+function PCCopyButton({ text, color }) {
   const [copied, setCopied] = React.useState(false);
   function doCopy() {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
+  if (color) {
+    return (
+      <button onClick={doCopy} style={{ padding: 4, borderRadius: 6, border: "none", cursor: "pointer", background: "transparent", color: copied ? color : "#6b7280", transition: "color .2s ease" }}>
+        {copied ? <IconCheck size={11} /> : <IconCopy size={11} />}
+      </button>
+    );
+  }
   return (
-    <button onClick={doCopy} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", fontSize: 10, borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "none", color: copied ? "rgb(var(--success))" : "var(--fg-3)", cursor: "pointer", transition: "color 0.2s ease" }}>
+    <button onClick={doCopy} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, fontSize: 10, background: "rgba(255,255,255,0.04)", border: "none", color: copied ? "#34d399" : "#6b7280", cursor: "pointer", fontFamily: "inherit" }}>
       {copied ? <IconCheck size={10} /> : <IconCopy size={10} />}
       {copied ? "Copied" : "Copy"}
     </button>
   );
 }
 
-// ── ChatMarkdown ──────────────────────────────────────────────────────────────
-function ChatMarkdown({ text }) {
+// ── Markdown renderer ─────────────────────────────────────────────────────────
+function PCMarkdown({ text, accentColor, primaryColor }) {
   if (!text) return null;
-  const accent = "#7c3aed";   // fallback for white AI bubble (CSS vars don't work on white bg)
-  const primary = "#6d28d9";
-
   function renderInline(raw) {
-    const parts = [];
-    let rest = raw, k = 0;
+    const parts = []; let rest = raw, k = 0;
     while (rest.length > 0) {
       const bold = rest.match(/^([\s\S]*?)\*\*(.+?)\*\*([\s\S]*)$/);
       if (bold && bold[1].length < rest.length) {
@@ -517,53 +539,342 @@ function ChatMarkdown({ text }) {
       const ic = rest.match(/^([\s\S]*?)`([^`]+)`([\s\S]*)$/);
       if (ic && ic[1].length < rest.length) {
         if (ic[1]) parts.push(<span key={k++}>{ic[1]}</span>);
-        parts.push(<code key={k++} style={{ background: "#f3f0ff", border: "1px solid #ddd4fe", borderRadius: 4, padding: "1px 6px", fontFamily: "monospace", fontSize: "0.82em", color: accent }}>{ic[2]}</code>);
+        parts.push(<code key={k++} style={{ background: `${accentColor}18`, border: `1px solid ${accentColor}44`, borderRadius: 4, padding: "1px 6px", fontFamily: "monospace", fontSize: ".82em", color: accentColor }}>{ic[2]}</code>);
         rest = ic[3]; continue;
       }
-      parts.push(<span key={k++}>{rest}</span>);
-      break;
+      parts.push(<span key={k++}>{rest}</span>); break;
     }
     return <>{parts}</>;
   }
-
   const blocks = text.split(/\n{2,}/);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {blocks.map((block, bi) => {
-        const t = block.trim();
-        if (!t) return null;
+        const t = block.trim(); if (!t) return null;
+        if (/^[-*_]{3,}$/.test(t)) return <hr key={bi} style={{ border: "none", borderTop: "1px solid rgba(139,92,246,0.25)", margin: "4px 0" }} />;
         const cb = t.match(/^```(\w*)\n?([\s\S]*?)```$/);
         if (cb) {
           const lang = cb[1], code = cb[2].replace(/\n$/, "");
           return (
             <div key={bi}>
-              {lang && <div style={{ background: "#f3f0ff", borderRadius: "8px 8px 0 0", padding: "3px 12px", borderBottom: "1px solid #e9d5ff" }}><span style={{ fontSize: 10, fontWeight: 600, color: primary, textTransform: "uppercase" }}>{lang}</span></div>}
-              <pre style={{ background: "#1e1b2e", borderRadius: lang ? "0 0 8px 8px" : 8, padding: "12px 14px", overflowX: "auto", fontFamily: "monospace", fontSize: 12.5, color: "#e2e8f0", lineHeight: 1.65, margin: 0 }}><code>{code}</code></pre>
+              {lang && <div style={{ background: "rgba(139,92,246,0.15)", borderRadius: "8px 8px 0 0", padding: "3px 12px", borderBottom: "1px solid rgba(139,92,246,0.2)" }}><span style={{ fontSize: 10, fontWeight: 600, color: primaryColor, textTransform: "uppercase" }}>{lang}</span></div>}
+              <pre style={{ background: "#050508", borderRadius: lang ? "0 0 8px 8px" : 8, padding: "12px 14px", overflowX: "auto", border: "1px solid rgba(139,92,246,0.2)", fontFamily: "monospace", fontSize: 12.5, color: "#e2e8f0", lineHeight: 1.65, margin: 0 }}><code>{code}</code></pre>
             </div>
           );
         }
-        const h1 = t.match(/^# (.+)/); if (h1) return <h1 key={bi} style={{ fontSize: 18, fontWeight: 800, color: "#111", margin: "2px 0 4px" }}>{renderInline(h1[1])}</h1>;
-        const h2 = t.match(/^## (.+)/); if (h2) return <h2 key={bi} style={{ fontSize: 15, fontWeight: 700, color: "#222", margin: "2px 0" }}>{renderInline(h2[1])}</h2>;
-        const h3 = t.match(/^### (.+)/); if (h3) return <h3 key={bi} style={{ fontSize: 13, fontWeight: 700, color: primary, margin: "2px 0" }}>{renderInline(h3[1])}</h3>;
+        const h1 = t.match(/^# (.+)/);   if (h1) return <h1 key={bi} style={{ fontSize: 20, fontWeight: 800, color: "#111", margin: "4px 0 6px" }}>{renderInline(h1[1])}</h1>;
+        const h2 = t.match(/^## (.+)/);  if (h2) return <h2 key={bi} style={{ fontSize: 16, fontWeight: 700, color: "#222", margin: "2px 0 4px" }}>{renderInline(h2[1])}</h2>;
+        const h3 = t.match(/^### (.+)/); if (h3) return <h3 key={bi} style={{ fontSize: 14, fontWeight: 700, color: primaryColor, margin: "2px 0" }}>{renderInline(h3[1])}</h3>;
         const lines = t.split("\n");
-        if (lines.length > 1 && lines.every(l => /^[-*•]\s/.test(l.trim()))) return (
+        if (lines.length > 0 && lines.every(l => /^[-*•]\s/.test(l.trim()))) return (
           <ul key={bi} style={{ padding: 0, margin: 0, listStyleType: "none", display: "flex", flexDirection: "column", gap: 5 }}>
-            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><span style={{ color: accent, flexShrink: 0, marginTop: 1 }}>▸</span><span style={{ color: "#1a1a1a", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^[-*•]\s/, ""))}</span></li>)}
+            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}><span style={{ color: primaryColor, flexShrink: 0, marginTop: 1 }}>▸</span><span style={{ color: "#222", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^[-*•]\s/, ""))}</span></li>)}
           </ul>
         );
-        if (lines.length > 1 && lines.every(l => /^\d+\.\s/.test(l.trim()))) return (
+        if (lines.length > 0 && lines.every(l => /^\d+\.\s/.test(l.trim()))) return (
           <ol key={bi} style={{ padding: 0, margin: 0, listStyleType: "none", display: "flex", flexDirection: "column", gap: 5 }}>
-            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><span style={{ color: accent, flexShrink: 0, fontWeight: 700, fontSize: 13, minWidth: 20, marginTop: 1 }}>{li + 1}.</span><span style={{ color: "#1a1a1a", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^\d+\.\s/, ""))}</span></li>)}
+            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}><span style={{ color: primaryColor, flexShrink: 0, fontWeight: 700, fontSize: 13, minWidth: 22, marginTop: 1 }}>{li + 1}.</span><span style={{ color: "#222", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^\d+\.\s/, ""))}</span></li>)}
           </ol>
         );
         return (
           <p key={bi} style={{ margin: 0, lineHeight: 1.8, color: "#1a1a1a", fontSize: 13.5 }}>
-            {lines.map((l, li) => (
-              <React.Fragment key={li}>{renderInline(l)}{li < lines.length - 1 && <br />}</React.Fragment>
-            ))}
+            {lines.map((l, li) => <React.Fragment key={li}>{renderInline(l)}{li < lines.length - 1 && <br />}</React.Fragment>)}
           </p>
         );
       })}
+    </div>
+  );
+}
+
+// ── PremiumCanvas (purple node network) ───────────────────────────────────────
+function PremiumCanvas() {
+  const canvasRef = React.useRef(null);
+  React.useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext("2d"); if (!ctx) return;
+    let animId;
+    let W = canvas.offsetWidth, H = canvas.offsetHeight;
+    canvas.width = W; canvas.height = H;
+    const COLORS = [
+      { hex: "#8b5cf6", rgb: "139,92,246" }, { hex: "#6366f1", rgb: "99,102,241" },
+      { hex: "#a78bfa", rgb: "167,139,250" }, { hex: "#7c3aed", rgb: "124,58,237" },
+      { hex: "#c4b5fd", rgb: "196,181,253" }, { hex: "#f59e0b", rgb: "245,158,11" },
+    ];
+    const nodes = Array.from({ length: 72 }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .45, vy: (Math.random() - .5) * .45,
+      r: Math.random() * 1.8 + .8, colorIdx: Math.floor(Math.random() * COLORS.length),
+      phase: Math.random() * Math.PI * 2, phaseSpeed: .012 + Math.random() * .018,
+    }));
+    const streaks = []; let streakTimer = 0;
+    function spawnStreak() {
+      const edge = Math.random(); let x, y, vx, vy;
+      if (edge < .5) { x = Math.random() * W; y = 0; vx = (Math.random() - .5) * 3; vy = 1.5 + Math.random() * 2; }
+      else { x = 0; y = Math.random() * H; vx = 1.5 + Math.random() * 2; vy = (Math.random() - .5) * 3; }
+      streaks.push({ x, y, vx, vy, life: 60 + Math.random() * 60, maxLife: 60 + Math.random() * 60 });
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H); streakTimer++;
+      if (streakTimer > 120 && Math.random() < .015) { spawnStreak(); streakTimer = 0; }
+      for (let i = streaks.length - 1; i >= 0; i--) {
+        const s = streaks[i], alpha = (s.life / s.maxLife) * .7, tl = 60;
+        const g = ctx.createLinearGradient(s.x - s.vx * tl, s.y - s.vy * tl, s.x, s.y);
+        g.addColorStop(0, "rgba(251,191,36,0)"); g.addColorStop(1, `rgba(251,191,36,${alpha})`);
+        ctx.beginPath(); ctx.moveTo(s.x - s.vx * tl, s.y - s.vy * tl); ctx.lineTo(s.x, s.y);
+        ctx.strokeStyle = g; ctx.lineWidth = 1.5; ctx.stroke();
+        s.x += s.vx; s.y += s.vy; s.life--;
+        if (s.life <= 0 || s.x > W + 100 || s.y > H + 100) streaks.splice(i, 1);
+      }
+      for (const n of nodes) {
+        n.x += n.vx; n.y += n.vy; n.phase += n.phaseSpeed;
+        if (n.x < 0) { n.x = 0; n.vx *= -1; } if (n.x > W) { n.x = W; n.vx *= -1; }
+        if (n.y < 0) { n.y = 0; n.vy *= -1; } if (n.y > H) { n.y = H; n.vy *= -1; }
+      }
+      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 160) {
+          const al = (1 - dist / 160) * .35;
+          const g = ctx.createLinearGradient(nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y);
+          g.addColorStop(0, `rgba(139,92,246,${al})`); g.addColorStop(1, `rgba(99,102,241,${al * .6})`);
+          ctx.beginPath(); ctx.moveTo(nodes[i].x, nodes[i].y); ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.strokeStyle = g; ctx.lineWidth = .7; ctx.stroke();
+        }
+      }
+      for (const n of nodes) {
+        const pulse = Math.sin(n.phase) * .5 + .5, r = n.r + pulse * 2, alpha = .5 + pulse * .5;
+        const { hex, rgb } = COLORS[n.colorIdx];
+        const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 5);
+        glow.addColorStop(0, `rgba(${rgb},${alpha * .45})`); glow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.beginPath(); ctx.arc(n.x, n.y, r * 5, 0, Math.PI * 2); ctx.fillStyle = glow; ctx.fill();
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.globalAlpha = alpha; ctx.fillStyle = hex; ctx.fill(); ctx.globalAlpha = 1;
+      }
+      animId = requestAnimationFrame(draw);
+    }
+    draw();
+    function onResize() { W = canvas.offsetWidth; H = canvas.offsetHeight; canvas.width = W; canvas.height = H; }
+    window.addEventListener("resize", onResize);
+    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", onResize); };
+  }, []);
+  return <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none", opacity: .65 }} />;
+}
+
+// ── AI Voice Orb Overlay ──────────────────────────────────────────────────────
+function AIVoiceOrbOverlay({ beatRef, beatPulse, onClose }) {
+  const WAVE_BARS = 28;
+  const [voiceGender,      setVoiceGender]      = React.useState(null);
+  const [showSwitcher,     setShowSwitcher]      = React.useState(false);
+  const [localStatus,      setLocalStatus]       = React.useState("listening");
+  const [userText,         setUserText]          = React.useState("");
+  const [aiText,           setAiText]            = React.useState("");
+  const isActiveRef = React.useRef(true);
+
+  React.useEffect(() => {
+    if (!voiceGender) return;
+    isActiveRef.current = true;
+    let recognition = null;
+
+    function pickVoice(voices) {
+      const preferred = voiceGender === "female" ? FEMALE_VOICES : MALE_VOICES;
+      for (const name of preferred) { const v = voices.find(vv => vv.name.includes(name)); if (v) return v; }
+      return voices.find(vv => vv.lang.toLowerCase().startsWith("en")) ?? voices[0] ?? null;
+    }
+
+    function speakResponse(text) {
+      if (!isActiveRef.current) return;
+      const cleanText = cleanForSpeech(text);
+      setLocalStatus("speaking"); setAiText(text);
+      if (!window.speechSynthesis) { setTimeout(listen, 300); return; }
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(cleanText);
+      const trySpeak = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const picked = pickVoice(voices); if (picked) utt.voice = picked;
+        if (voiceGender === "male") { utt.rate = .90; utt.pitch = .85; utt.volume = 1; }
+        else { utt.rate = .88; utt.pitch = 1.08; utt.volume = 1; }
+        utt.onend = () => { if (isActiveRef.current) setTimeout(listen, 600); };
+        utt.onerror = () => { if (isActiveRef.current) setTimeout(listen, 600); };
+        window.speechSynthesis.speak(utt);
+      };
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) trySpeak();
+      else { window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
+    }
+
+    async function sendQuery(text) {
+      if (!isActiveRef.current) return;
+      setLocalStatus("thinking"); setUserText(text); setAiText("");
+      try {
+        const reply = await window.ariaChat(text, []);
+        if (isActiveRef.current) speakResponse(reply.trim());
+      } catch {
+        if (isActiveRef.current) speakResponse("Sorry, I had a bit of trouble there. Could you try again?");
+      }
+    }
+
+    function listen() {
+      if (!isActiveRef.current) return;
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { setLocalStatus("listening"); return; }
+      if (recognition) { try { recognition.abort(); } catch {} recognition = null; }
+      let transcriptText = ""; setLocalStatus("listening"); setUserText("");
+      const rec = new SR(); recognition = rec;
+      rec.continuous = false; rec.interimResults = true; rec.lang = "en-US";
+      rec.onresult = (e) => { let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; transcriptText = t; setUserText(t); };
+      rec.onend = () => {
+        if (!isActiveRef.current) return;
+        if (transcriptText.trim()) setTimeout(() => { if (isActiveRef.current) sendQuery(transcriptText); }, 900);
+        else setTimeout(listen, 600);
+      };
+      rec.onerror = (e) => { if (!isActiveRef.current || e.error === "not-allowed") return; setTimeout(() => { if (isActiveRef.current) listen(); }, 800); };
+      try { rec.start(); } catch {}
+    }
+
+    listen();
+    return () => {
+      isActiveRef.current = false;
+      if (recognition) { try { recognition.abort(); } catch {} }
+      window.speechSynthesis?.cancel();
+    };
+  }, [voiceGender]);
+
+  const waveDelays = Array.from({ length: WAVE_BARS }, (_, i) => {
+    const center = (WAVE_BARS - 1) / 2, dist = Math.abs(i - center) / center;
+    return .05 + dist * .55;
+  });
+
+  const statusConfig = {
+    listening: { label: "Listening", ringColor: "rgba(251,191,36,", textColor: "#fbbf24", dotClass: "bg-amber-400", ringDur: "2.4s" },
+    thinking:  { label: "Thinking",  ringColor: "rgba(251,146,60,", textColor: "#fb923c", dotClass: "bg-orange-400", ringDur: "3.5s" },
+    speaking:  { label: "Speaking",  ringColor: "rgba(234,179,8,",  textColor: "#eab308", dotClass: "bg-yellow-400", ringDur: "1.4s" },
+  };
+  const sc = statusConfig[localStatus];
+
+  return (
+    <div style={{ position: "absolute", inset: 0, zIndex: 50, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "linear-gradient(160deg,rgba(10,8,4,.96) 0%,rgba(20,14,4,.95) 50%,rgba(6,6,10,.96) 100%)", backdropFilter: "blur(28px)", animation: "voiceOverlayIn .35s ease forwards" }}>
+      <div style={{ position: "absolute", inset: 0, boxShadow: "inset 0 0 80px rgba(251,191,36,.04),inset 0 1px 0 rgba(251,191,36,.12)", pointerEvents: "none" }} />
+
+      {/* Close */}
+      <button onClick={onClose} style={{ position: "absolute", top: 20, right: 20, padding: 8, borderRadius: "50%", border: "1px solid rgba(251,191,36,.2)", background: "rgba(251,191,36,.06)", color: "#d4a520", cursor: "pointer" }}>
+        <IconClose size={18} />
+      </button>
+
+      {/* Header badge */}
+      <div style={{ position: "absolute", top: 20, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, border: "1px solid rgba(251,191,36,.25)", background: "rgba(251,191,36,.08)", boxShadow: "0 0 20px rgba(251,191,36,.1)" }}>
+          <span style={{ color: "#fbbf24", fontSize: 12 }}>♛</span>
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", color: "#fbbf24" }}>QuantuMania Premium Voice</span>
+        </div>
+      </div>
+
+      {/* Gender picker */}
+      {!voiceGender && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24, padding: "0 24px", animation: "voiceOrbIn .4s cubic-bezier(.22,1,.36,1) forwards" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 28, color: "#fbbf24", marginBottom: 8 }}>♛</div>
+            <p style={{ color: "white", fontSize: 18, fontWeight: 600, marginBottom: 4 }}>Choose a voice</p>
+            <p style={{ color: "#6b7280", fontSize: 13 }}>Select the voice you'd like to talk with</p>
+          </div>
+          <div style={{ display: "flex", gap: 20 }}>
+            {[{ id: "female", icon: "♀", label: "Female" }, { id: "male", icon: "♂", label: "Male" }].map(v => (
+              <button key={v.id} onClick={() => setVoiceGender(v.id)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "28px 40px", borderRadius: 16, border: "1px solid rgba(251,191,36,.2)", background: "rgba(251,191,36,.06)", boxShadow: "0 0 32px rgba(251,191,36,.06)", cursor: "pointer", transition: "all .2s ease", fontFamily: "inherit" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(251,191,36,.12)"; e.currentTarget.style.borderColor = "rgba(251,191,36,.5)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(251,191,36,.06)"; e.currentTarget.style.borderColor = "rgba(251,191,36,.2)"; }}
+              >
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(251,191,36,.15)", border: "1px solid rgba(251,191,36,.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, color: "#fbbf24" }}>{v.icon}</div>
+                <span style={{ fontWeight: 600, fontSize: 13, letterSpacing: "0.06em", color: "#fbbf24" }}>{v.label}</span>
+                <span style={{ fontSize: 9, color: "rgba(245,158,11,0.7)", letterSpacing: "0.15em", textTransform: "uppercase" }}>Premium</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {voiceGender && (
+        <>
+          {/* Gender badge */}
+          <div style={{ position: "absolute", top: 60, left: 0, right: 0, display: "flex", justifyContent: "center" }}>
+            <button onClick={() => setShowSwitcher(v => !v)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, border: "1px solid rgba(251,191,36,.3)", background: "rgba(251,191,36,.1)", color: "#fbbf24", cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 14 }}>♛</span>
+              {voiceGender === "female" ? "♀ Female voice" : "♂ Male voice"}
+              <span style={{ opacity: .6 }}>⇅</span>
+            </button>
+          </div>
+
+          {/* Orb + rings */}
+          <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", animation: "voiceOrbIn .4s cubic-bezier(.22,1,.36,1) forwards" }}>
+            {["pc-voice-ring-1","pc-voice-ring-2","pc-voice-ring-3","pc-voice-ring-4"].map((cls, i) => (
+              <div key={i} className={cls} style={{ position: "absolute", width: 300, height: 300, borderRadius: "50%", border: `${i < 2 ? "1.5px" : "1px"} solid ${sc.ringColor}${[".55)",".4)",".3)",".18)"][i]}`, animationDuration: sc.ringDur, pointerEvents: "none" }} />
+            ))}
+            <div style={{ position: "absolute", width: 340, height: 340, borderRadius: "50%", background: "radial-gradient(circle,rgba(251,191,36,.18) 0%,rgba(234,179,8,.08) 50%,transparent 70%)", pointerEvents: "none" }} />
+            <div className="pc-orb-voice">
+              <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={220} floats />
+            </div>
+          </div>
+
+          {/* Transcript */}
+          <div style={{ marginTop: 20, padding: "0 40px", textAlign: "center", maxWidth: 380, minHeight: 44 }}>
+            {localStatus === "listening" && userText && <p style={{ fontSize: 13, color: "#d1d5db", fontStyle: "italic", lineHeight: 1.6 }}>"{userText}"</p>}
+            {localStatus === "listening" && !userText && <p style={{ fontSize: 11, color: "#4b5563", letterSpacing: "0.06em" }}>Say anything to start…</p>}
+            {localStatus === "thinking" && userText && <p style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.6 }}>"{userText}"</p>}
+            {localStatus === "speaking" && aiText && <p style={{ fontSize: 13, color: "#e5e7eb", lineHeight: 1.6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" }}>{aiText}</p>}
+          </div>
+
+          {/* Status + waveform */}
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 300, letterSpacing: "0.15em", color: sc.textColor }}>{sc.label}</span>
+              {localStatus !== "thinking" ? (
+                <>
+                  <span className="pc-status-dot" style={{ width: 4, height: 4, borderRadius: "50%", background: sc.textColor, display: "inline-block" }} />
+                  <span className="pc-status-dot" style={{ width: 4, height: 4, borderRadius: "50%", background: sc.textColor, display: "inline-block" }} />
+                  <span className="pc-status-dot" style={{ width: 4, height: 4, borderRadius: "50%", background: sc.textColor, display: "inline-block" }} />
+                </>
+              ) : (
+                <span style={{ display: "flex", gap: 4, marginLeft: 4 }}>
+                  {[0, 1, 2].map(i => <span key={i} className="pc-typing-dot" style={{ width: 4, height: 4, borderRadius: "50%", background: "#fbbf24", display: "inline-block", animationDelay: `${i * .2}s` }} />)}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 32 }}>
+              {waveDelays.map((delay, i) => {
+                const lc = `rgba(${i%3===0?"139,92,246":i%3===1?"99,102,241":"6,182,212"},.8)`;
+                const tc = `rgba(251,191,36,${.2 + (i / WAVE_BARS) * .35})`;
+                const sc2 = `rgba(${i%3===0?"52,211,153":i%3===1?"99,102,241":"139,92,246"},.9)`;
+                const barColor = localStatus === "thinking" ? tc : localStatus === "speaking" ? sc2 : lc;
+                const dur = localStatus === "speaking" ? .38 + (i % 5) * .07 : .7 + (i % 5) * .12;
+                return <div key={i} style={{ width: 3, height: 28, borderRadius: 4, background: barColor, transformOrigin: "bottom", animation: `waveBar ${dur}s ease-in-out ${delay}s infinite`, opacity: localStatus === "thinking" ? .45 : 1 }} />;
+              })}
+            </div>
+          </div>
+
+          {/* Voice switcher + End button */}
+          <div style={{ marginTop: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            {showSwitcher ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 16, border: "1px solid rgba(251,191,36,.2)", background: "rgba(20,14,4,.8)" }}>
+                {[{ id: "female", icon: "♀", label: "Female" }, { id: "male", icon: "♂", label: "Male" }].map(v => (
+                  <button key={v.id} onClick={() => { setVoiceGender(v.id); setShowSwitcher(false); }}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "10px 24px", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", transition: "all .2s ease", background: voiceGender === v.id ? "rgba(251,191,36,.2)" : "transparent", border: voiceGender === v.id ? "1px solid rgba(251,191,36,.5)" : "1px solid transparent", color: voiceGender === v.id ? "#fbbf24" : "#4b5563" }}
+                  >
+                    <span style={{ fontSize: 20 }}>{v.icon}</span>
+                    <span style={{ fontSize: 11, fontWeight: 500 }}>{v.label}</span>
+                  </button>
+                ))}
+                <button onClick={() => setShowSwitcher(false)} style={{ width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 11 }}>✕</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowSwitcher(true)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, fontSize: 11, fontWeight: 500, border: "1px solid rgba(251,191,36,.2)", background: "rgba(251,191,36,.06)", color: "#d97706", cursor: "pointer", fontFamily: "inherit" }}>
+                ⇅ Switch voice
+              </button>
+            )}
+            <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 28px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: "1px solid rgba(251,191,36,.25)", background: "rgba(251,191,36,.1)", color: "#d97706", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 20px rgba(251,191,36,.1)" }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#d97706" }} />
+              End voice chat
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
