@@ -173,7 +173,7 @@ const NAV_ITEMS = [
   { id: "settings",   label: "Settings",   Icon: IconSettings,  desc: "Model & integrations" },
 ];
 
-function Sidebar({ current, onNavigate }) {
+function Sidebar({ current, onNavigate, onToggle }) {
   return (
     <aside style={{
       width: 240,
@@ -186,8 +186,29 @@ function Sidebar({ current, onNavigate }) {
       position: "relative",
       zIndex: 2,
     }}>
-      <div style={{ padding: "0 8px 18px" }}>
+      <div style={{ padding: "0 8px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <BrandMark size={32} />
+        {onToggle && (
+          <button
+            onClick={onToggle}
+            title="Hide sidebar"
+            style={{
+              width: 28, height: 28,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "transparent",
+              border: "1px solid var(--hairline)",
+              borderRadius: "var(--r-sm)",
+              color: "var(--fg-3)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "var(--fg-1)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-3)"; }}
+          >
+            <IconClose size={13} />
+          </button>
+        )}
       </div>
 
       <div className="label" style={{ padding: "12px 12px 8px" }}>Workspace</div>

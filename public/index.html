@@ -59,11 +59,12 @@
     };
 
     function App() {
-      const [authDone, setAuthDone] = useState(false);
-      const [booted,   setBooted]   = useState(false);
-      const [page,     setPage]     = useState("chat");
-      const [theme,    setTheme]    = useState("default");
-      const [navKey,   setNavKey]   = useState(0);
+      const [authDone,     setAuthDone]     = useState(false);
+      const [booted,       setBooted]       = useState(false);
+      const [page,         setPage]         = useState("chat");
+      const [theme,        setTheme]        = useState("default");
+      const [navKey,       setNavKey]       = useState(0);
+      const [sidebarOpen,  setSidebarOpen]  = useState(true);
 
       useEffect(() => {
         if (theme === "default") document.documentElement.removeAttribute("data-theme");
@@ -91,7 +92,30 @@
       // Step 3: Main app
       return (
         <div className="app-root" style={{ display: "flex", flexDirection: "row" }}>
-          <Sidebar current={page} onNavigate={navigate} />
+          {sidebarOpen && <Sidebar current={page} onNavigate={navigate} onToggle={() => setSidebarOpen(false)} />}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              title="Show sidebar"
+              style={{
+                position: "fixed", left: 12, top: "50%", transform: "translateY(-50%)",
+                zIndex: 100,
+                width: 32, height: 32,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "var(--bg-elev-2)",
+                border: "1px solid var(--hairline-2)",
+                borderRadius: "var(--r-md)",
+                color: "var(--fg-2)",
+                cursor: "pointer",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(var(--accent),0.12)"; e.currentTarget.style.color = "var(--fg-1)"; e.currentTarget.style.borderColor = "rgba(var(--accent),0.3)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "var(--bg-elev-2)"; e.currentTarget.style.color = "var(--fg-2)"; e.currentTarget.style.borderColor = "var(--hairline-2)"; }}
+            >
+              <IconMenu size={15} />
+            </button>
+          )}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
             <TopBar title={meta.title} subtitle={meta.sub} theme={theme} setTheme={setTheme} />
             <main key={navKey} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
