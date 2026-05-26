@@ -1,104 +1,100 @@
-/* ─── Premium Chat — Aria AI co-worker ───────────────────────────
-   Gold theme · GoldOrb · particle canvas · markdown renderer
+/* ─── QuantuMania Chat — Aria AI co-worker ─────────────────────
+   Keeps existing app layout & card design.
+   Premium features: markdown, editing, spinning input border,
+   suggestion pills, voice input, copy buttons.
    API: window.ariaChat(message, history) → Promise<string>
    ─────────────────────────────────────────────────────────────── */
 
 const CHAT_CSS = `
-  @keyframes chatFade {
-    0%   { opacity: 0; transform: translateY(8px); }
-    100% { opacity: 1; transform: translateY(0); }
+  @keyframes chatSpinBorder {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
-  @keyframes chatOrbFloat {
-    0%   { transform: translateY(0px); }
-    50%  { transform: translateY(-14px); }
-    100% { transform: translateY(0px); }
+  @keyframes chatSpinBorderRev {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(-360deg); }
   }
-  @keyframes chatOrbRing {
-    0%   { transform: scale(1);   opacity: 0.85; }
-    100% { transform: scale(1.9); opacity: 0; }
+  @keyframes chatGlowPulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(var(--accent), 0.3), 0 0 20px rgba(var(--accent), 0.15); }
+    50%       { box-shadow: 0 0 0 1px rgba(var(--accent), 0.5), 0 0 36px rgba(var(--accent), 0.3); }
   }
-  @keyframes chatOrbRing2 {
-    0%   { transform: scale(1);    opacity: 0.5; }
-    100% { transform: scale(1.55); opacity: 0; }
+  @keyframes chatOrbPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(var(--accent), 0.5); }
+    50%       { box-shadow: 0 0 22px rgba(var(--accent), 0.8), 0 0 40px rgba(var(--accent), 0.4); }
   }
   @keyframes chatTypingDot {
     0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
     40%            { transform: scale(1);   opacity: 1; }
   }
-  @keyframes chatGoldPulse {
-    0%, 100% { box-shadow: 0 0 18px rgba(251,191,36,0.25), 0 0 40px rgba(245,158,11,0.1); }
-    50%       { box-shadow: 0 0 30px rgba(251,191,36,0.5),  0 0 70px rgba(245,158,11,0.25); }
+  @keyframes chatMsgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes chatBorderSpin {
-    0%   { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  @keyframes chatFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes chatBorderSpinRev {
-    0%   { transform: rotate(0deg); }
-    100% { transform: rotate(-360deg); }
-  }
-  @keyframes chatShimmer {
-    0%   { background-position: -200% center; }
-    100% { background-position: 200% center; }
-  }
-  .chat-d0 { animation: chatFade 0.6s ease forwards; }
-  .chat-d1 { animation: chatFade 0.6s ease 0.1s forwards; opacity: 0; }
-  .chat-d2 { animation: chatFade 0.6s ease 0.25s forwards; opacity: 0; }
-  .chat-d3 { animation: chatFade 0.6s ease 0.4s forwards; opacity: 0; }
-  .chat-msg-in { animation: chatFade 0.35s ease forwards; }
-  .chat-dot { animation: chatTypingDot 1.2s infinite; }
+  .chat-msg-in     { animation: chatMsgIn 0.3s ease forwards; }
+  .chat-fade-in    { animation: chatFadeIn 0.5s ease forwards; }
+  .chat-fade-d1    { animation: chatFadeIn 0.5s 0.1s ease forwards; opacity: 0; }
+  .chat-fade-d2    { animation: chatFadeIn 0.5s 0.22s ease forwards; opacity: 0; }
+  .chat-fade-d3    { animation: chatFadeIn 0.5s 0.36s ease forwards; opacity: 0; }
+  .chat-dot        { animation: chatTypingDot 1.2s infinite; }
   .chat-dot:nth-child(2) { animation-delay: 0.2s; }
   .chat-dot:nth-child(3) { animation-delay: 0.4s; }
   .chat-scroll::-webkit-scrollbar { width: 4px; }
   .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-  .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+  .chat-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+  .chat-action-btns { opacity: 0; transition: opacity 0.15s ease; }
+  .chat-user-msg:hover .chat-action-btns { opacity: 1; }
 `;
+
+const QUICK_PROMPTS = [
+  { I: IconMail,      label: "Draft an email to a customer about our SOC2 cert" },
+  { I: IconLinkedIn,  label: "Write a LinkedIn post about our latest product" },
+  { I: IconBriefcase, label: "Help me reject a candidate politely" },
+  { I: IconUsers,     label: "Summarize today's interview scores" },
+  { I: IconPhone,     label: "What did the last caller want?" },
+  { I: IconBarChart,  label: "How's our hiring funnel performing?" },
+];
 
 // ── ChatPage ──────────────────────────────────────────────────────────────────
 function ChatPage() {
-  const beatRef = React.useRef({ intensity: 0 });
-  const [beatPulse, setBeatPulse] = React.useState(0);
-  const [inputVal, setInputVal] = React.useState("");
-  const [messages, setMessages] = React.useState([]);
-  const [isTyping, setIsTyping] = React.useState(false);
-  const [editingId, setEditingId] = React.useState(null);
+  const [messages,    setMessages]    = React.useState([]);
+  const [input,       setInput]       = React.useState("");
+  const [thinking,    setThinking]    = React.useState(false);
+  const [aiActive,    setAiActive]    = React.useState(false);
+  const [editingId,   setEditingId]   = React.useState(null);
   const [editingText, setEditingText] = React.useState("");
-  const [hoveredId, setHoveredId] = React.useState(null);
-  const bottomRef = React.useRef(null);
+  const scrollRef = React.useRef(null);
 
   React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
-
-  function triggerBeat() {
-    beatRef.current.intensity = 1.0;
-    setBeatPulse(p => p + 1);
-  }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, thinking]);
 
   async function send(text, priorMessages) {
-    const trimmed = (typeof text === "string" ? text : inputVal).trim();
-    if (!trimmed || isTyping) return;
-    setInputVal("");
+    const userText = (typeof text === "string" ? text : input).trim();
+    if (!userText || thinking) return;
+    setInput("");
 
     const base = priorMessages !== undefined ? priorMessages : messages;
-    const id = Date.now();
-    const newMsgs = [...base, { role: "user", text: trimmed, id }];
-    setMessages(newMsgs);
-    triggerBeat();
-    setIsTyping(true);
+    const newMessages = [...base, { who: "user", text: userText, id: Date.now() }];
+    setMessages(newMessages);
+    setThinking(true);
+    setAiActive(true);
 
     try {
-      const history = newMsgs.slice(0, -1).map(m => ({
-        role: m.role === "user" ? "user" : "model",
+      const history = newMessages.slice(0, -1).map(m => ({
+        role: m.who === "user" ? "user" : "model",
         content: m.text,
       }));
-      const reply = await window.ariaChat(trimmed, history);
-      setMessages(prev => [...prev, { role: "ai", text: reply.trim(), id: id + 1 }]);
-      triggerBeat();
+      const reply = await window.ariaChat(userText, history);
+      setMessages(prev => [...prev, { who: "ai", text: reply.trim(), id: Date.now() + 1 }]);
     } catch (e) {
-      setMessages(prev => [...prev, { role: "ai", text: "Couldn't reach the neural net — try again in a moment.", id: id + 1, error: true }]);
+      setMessages(prev => [...prev, { who: "ai", text: "Couldn't reach the neural net — try again in a moment.", id: Date.now() + 1, error: true }]);
     }
-    setIsTyping(false);
+    setThinking(false);
+    setAiActive(false);
   }
 
   function handleEditSave(id) {
@@ -111,267 +107,209 @@ function ChatPage() {
     send(trimmed, prior);
   }
 
-  const chatOpen = messages.length > 0;
+  const chatStarted = messages.length > 0;
 
   return (
     <div style={{
-      position: "relative",
+      padding: 24,
+      display: "grid",
+      gridTemplateColumns: "1.4fr 320px",
+      gap: 16,
       height: "calc(100vh - 64px)",
-      background: "#050308",
-      color: "white",
-      fontFamily: "var(--font-sans)",
       overflow: "hidden",
-      display: "flex",
-      flexDirection: "column",
     }}>
-      <ChatCanvas />
       <style>{CHAT_CSS}</style>
 
-      {/* ── Landing view ── */}
-      {!chatOpen && (
-        <div style={{
-          flex: 1, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          padding: "0 24px", position: "relative", zIndex: 10,
-        }}>
-          <div style={{
-            position: "absolute", width: 340, height: 340, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(251,191,36,0.08) 0%, transparent 70%)",
-            top: "50%", left: "50%", transform: "translate(-50%, -62%)", pointerEvents: "none",
-          }} />
+      {/* ── Left: chat stage ── */}
+      <div className="card card-glow" style={{ display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+        <div className="grid-bg" />
 
-          <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={160} floats />
-
-          <div className="chat-d1" style={{ textAlign: "center", marginTop: 24, marginBottom: 12 }}>
-            <div style={{ fontSize: 28, fontWeight: 300, color: "#d1d5db", marginBottom: 4 }}>Good to See You!</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: "white" }}>
-              How Can I <em style={{ fontStyle: "italic", fontWeight: 700 }}>Help</em> You Today?
+        {/* Header */}
+        <div className="card-header" style={{ position: "relative", zIndex: 1 }}>
+          <div className="row gap-3">
+            <AriaOrb size={36} active={aiActive} />
+            <div className="col" style={{ gap: 0 }}>
+              <div className="row gap-2">
+                <h3 className="h3" style={{ margin: 0 }}>Aria</h3>
+                <span className="pill pill-success" style={{ height: 20 }}>
+                  <span className="dot dot-success" style={{ animation: "pulse-soft 1.6s infinite" }} />
+                  {aiActive ? "Thinking" : "Online"}
+                </span>
+              </div>
+              <span style={{ fontSize: 10.5, color: "var(--fg-3)", letterSpacing: "0.06em" }}>
+                Quantum core · v4.2 · Groq + Cloudflare
+              </span>
             </div>
           </div>
-
-          <div className="chat-d2" style={{ fontSize: 13, color: "#6b7280", marginBottom: 40, textAlign: "center" }}>
-            I'm available 24/7 — ask me anything.
-          </div>
-
-          <div className="chat-d3" style={{ width: "100%", maxWidth: 576 }}>
-            <PremiumInput inputVal={inputVal} setInputVal={setInputVal} onSend={() => send()} />
-          </div>
-
-          <div className="chat-d3" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 576, marginTop: 20 }}>
-            {["Draft an email to a client", "Summarize today's interviews", "Write a LinkedIn post about us"].map(label => (
-              <SuggestionPill key={label} label={label} onClick={() => send(label)} />
-            ))}
+          <div className="row gap-2">
+            <button className="btn btn-sm btn-ghost" onClick={() => setMessages([])}><IconPlus size={13} />New chat</button>
           </div>
         </div>
-      )}
 
-      {/* ── Chat view ── */}
-      {chatOpen && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingTop: 12, zIndex: 10, overflow: "hidden" }}>
-          {/* Orb + New Chat */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingBottom: 8, flexShrink: 0, position: "relative" }}>
-            <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={56} />
-            <button
-              onClick={() => setMessages([])}
-              style={{
-                position: "absolute", right: 20,
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 14px", borderRadius: 999,
-                border: "1px solid rgba(251,191,36,0.25)",
-                background: "rgba(251,191,36,0.06)",
-                color: "#d97706", fontSize: 12, fontWeight: 500, cursor: "pointer",
-              }}
-            >
-              <IconPlus size={12} /> New Chat
-            </button>
+        {/* ── Landing (no messages yet) ── */}
+        {!chatStarted && (
+          <div className="col" style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 32, position: "relative", zIndex: 1, gap: 0 }}>
+            <div className="chat-fade-in" style={{ marginBottom: 24 }}>
+              <AriaOrb size={100} active={false} pulse />
+            </div>
+            <div className="chat-fade-d1" style={{ textAlign: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 22, fontWeight: 300, color: "var(--fg-2)", marginBottom: 4 }}>Good to see you.</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-1)" }}>How can I <em style={{ fontStyle: "italic" }}>help</em> you today?</div>
+            </div>
+            <div className="chat-fade-d2" style={{ fontSize: 12.5, color: "var(--fg-3)", marginBottom: 32, textAlign: "center" }}>
+              I'm available 24/7 — ask me anything about your company.
+            </div>
+            <div className="chat-fade-d3" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 480, marginBottom: 32 }}>
+              {["Draft an email to a client", "Summarize today's interviews", "Write a LinkedIn post"].map(label => (
+                <button
+                  key={label}
+                  onClick={() => send(label)}
+                  style={{
+                    padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 500,
+                    background: "rgba(var(--accent), 0.08)",
+                    border: "1px solid rgba(var(--accent), 0.25)",
+                    color: "rgb(var(--accent-3))",
+                    cursor: "pointer", transition: "all 0.2s ease",
+                    fontFamily: "inherit",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(var(--accent), 0.15)"; e.currentTarget.style.borderColor = "rgba(var(--accent), 0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(var(--accent), 0.08)"; e.currentTarget.style.borderColor = "rgba(var(--accent), 0.25)"; }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="chat-fade-d3" style={{ width: "100%", maxWidth: 520 }}>
+              <ChatInput value={input} onChange={setInput} onSend={() => send()} />
+            </div>
           </div>
+        )}
 
-          {/* Messages */}
-          <div className="chat-scroll" style={{
-            flex: 1, overflowY: "auto", padding: "16px 24px",
-            display: "flex", flexDirection: "column", gap: 20,
-            maxWidth: 768, width: "100%", marginLeft: "auto", marginRight: "auto",
-          }}>
-            {messages.map(msg => (
-              <div
-                key={msg.id}
-                className="chat-msg-in"
-                style={{ display: "flex", gap: 12, flexDirection: msg.role === "user" ? "row-reverse" : "row" }}
-                onMouseEnter={() => setHoveredId(msg.id)}
-                onMouseLeave={() => setHoveredId(null)}
-              >
-                {msg.role === "ai" && (
-                  <div style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0, marginTop: 2,
-                  }}>
-                    <IconSparkles size={14} style={{ color: "#fbbf24" }} />
+        {/* ── Chat messages ── */}
+        {chatStarted && (
+          <>
+            <div ref={scrollRef} className="chat-scroll" style={{ flex: 1, padding: "20px 24px", overflowY: "auto", position: "relative", zIndex: 1 }}>
+              <div className="col gap-4">
+                {messages.map(m => (
+                  <ChatMessage
+                    key={m.id}
+                    m={m}
+                    editingId={editingId}
+                    editingText={editingText}
+                    setEditingId={setEditingId}
+                    setEditingText={setEditingText}
+                    onEditSave={handleEditSave}
+                  />
+                ))}
+                {thinking && (
+                  <div className="row gap-3 chat-msg-in" style={{ alignItems: "flex-start" }}>
+                    <AriaOrb size={28} active={true} />
+                    <div style={{
+                      padding: "10px 14px",
+                      background: "rgba(var(--accent), 0.06)",
+                      border: "1px solid rgba(var(--accent), 0.18)",
+                      borderRadius: 12,
+                      display: "flex", gap: 5, alignItems: "center",
+                    }}>
+                      {[0, 1, 2].map(j => (
+                        <span key={j} className="chat-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "rgb(var(--accent-3))", display: "inline-block" }} />
+                      ))}
+                    </div>
                   </div>
                 )}
-
-                <div style={{
-                  display: "flex", flexDirection: "column", gap: 6,
-                  alignItems: msg.role === "user" ? "flex-end" : "flex-start",
-                  maxWidth: "80%",
-                }}>
-                  {msg.role === "user" ? (
-                    <>
-                      {editingId === msg.id ? (
-                        <div style={{ minWidth: 220, maxWidth: 340 }}>
-                          <textarea
-                            autoFocus
-                            value={editingText}
-                            onChange={e => setEditingText(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditSave(msg.id); }
-                              if (e.key === "Escape") { setEditingId(null); setEditingText(""); }
-                            }}
-                            rows={Math.min(6, editingText.split("\n").length + 1)}
-                            style={{
-                              width: "100%", padding: "10px 14px", borderRadius: 14,
-                              fontSize: 13, lineHeight: 1.6, color: "white",
-                              outline: "none", resize: "none",
-                              background: "linear-gradient(135deg,#d97706,#ea580c)",
-                              border: "1.5px solid rgba(251,191,36,0.6)",
-                              boxShadow: "0 0 16px rgba(251,191,36,0.3)",
-                              fontFamily: "inherit",
-                            }}
-                          />
-                          <div style={{ display: "flex", gap: 8, marginTop: 6, justifyContent: "flex-end" }}>
-                            <button onClick={() => { setEditingId(null); setEditingText(""); }} style={{ padding: "4px 12px", fontSize: 11, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "none", color: "#9ca3af", cursor: "pointer" }}>Cancel</button>
-                            <button onClick={() => handleEditSave(msg.id)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 12px", fontSize: 11, borderRadius: 8, background: "#f59e0b", border: "none", color: "#1a0800", fontWeight: 600, cursor: "pointer" }}>
-                              <IconSend size={10} /> Send
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{
-                            padding: "10px 14px", borderRadius: 14, borderTopRightRadius: 4,
-                            fontSize: 13, lineHeight: 1.6, color: "white",
-                            background: "linear-gradient(135deg,#d97706,#ea580c)",
-                            boxShadow: "0 2px 16px rgba(251,191,36,0.2)",
-                            whiteSpace: "pre-wrap",
-                          }}>
-                            {msg.text}
-                          </div>
-                          <div style={{ display: "flex", gap: 4, opacity: hoveredId === msg.id ? 1 : 0, transition: "opacity 0.15s ease" }}>
-                            <button
-                              onClick={() => { setEditingId(msg.id); setEditingText(msg.text); }}
-                              style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, fontSize: 10, background: "rgba(255,255,255,0.04)", border: "none", color: "#9ca3af", cursor: "pointer" }}
-                            >
-                              <IconZap size={9} /> Edit
-                            </button>
-                            <GoldCopyBtn text={msg.text} iconOnly />
-                          </div>
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <div style={{
-                      borderRadius: 14, borderTopLeftRadius: 4,
-                      overflow: "hidden", background: "white",
-                      border: "1px solid rgba(251,191,36,0.15)",
-                      boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-                    }}>
-                      <div style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "8px 12px", borderBottom: "1px solid rgba(0,0,0,0.07)",
-                        background: "rgba(251,191,36,0.08)",
-                      }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#d97706" }}>
-                          ✦ QuantuMania AI
-                        </span>
-                        <GoldCopyBtn text={msg.text} color="#d97706" />
-                      </div>
-                      <div style={{ padding: "14px 16px", background: "white" }}>
-                        <ChatMarkdown text={msg.text} accentColor="#f59e0b" primaryColor="#d97706" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {msg.role === "user" && (
-                  <div style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    background: "rgba(251,191,36,0.2)", border: "1px solid rgba(251,191,36,0.3)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0, marginTop: 2, fontSize: 10, fontWeight: 700, color: "#fcd34d",
-                  }}>ME</div>
-                )}
               </div>
-            ))}
+            </div>
 
-            {isTyping && (
-              <div className="chat-msg-in" style={{ display: "flex", gap: 12 }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2,
-                }}>
-                  <IconSparkles size={13} style={{ color: "#fbbf24" }} />
-                </div>
-                <div style={{
-                  padding: "12px 16px", borderRadius: 14, borderTopLeftRadius: 4,
-                  background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.15)",
-                  display: "flex", alignItems: "center", gap: 6,
-                }}>
-                  <span className="chat-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", display: "inline-block" }} />
-                  <span className="chat-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", display: "inline-block" }} />
-                  <span className="chat-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#fbbf24", display: "inline-block" }} />
-                </div>
+            <div style={{ padding: "12px 18px 18px", borderTop: "1px solid var(--hairline)", position: "relative", zIndex: 1 }}>
+              <ChatInput value={input} onChange={setInput} onSend={() => send()} />
+              <div className="row" style={{ marginTop: 8, justifyContent: "space-between", fontSize: 10.5, color: "var(--fg-3)" }}>
+                <span>↵ to send · ⇧↵ for new line</span>
+                <span>Aria v4.2 · Groq + Cloudflare</span>
               </div>
-            )}
-            <div ref={bottomRef} />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Right: quick actions ── */}
+      <div className="col gap-4" style={{ overflowY: "auto" }}>
+        <div className="card">
+          <div className="card-header">
+            <h3 className="h3">Quick prompts</h3>
+            <IconSparkles size={14} style={{ color: "rgb(var(--accent-3))" }} />
           </div>
-
-          <div style={{ flexShrink: 0, padding: "0 24px 24px", maxWidth: 768, width: "100%", marginLeft: "auto", marginRight: "auto" }}>
-            <PremiumInput inputVal={inputVal} setInputVal={setInputVal} onSend={() => send()} />
+          <div className="col" style={{ padding: 6 }}>
+            {QUICK_PROMPTS.map((p, i) => (
+              <button
+                key={i}
+                onClick={() => send(p.label)}
+                style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", background: "transparent", border: "none", borderRadius: "var(--r-sm)", color: "var(--fg-2)", fontSize: 12.5, fontFamily: "inherit", textAlign: "left", lineHeight: 1.45, cursor: "pointer", transition: "background 0.15s ease" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(var(--accent), 0.06)"; e.currentTarget.style.color = "var(--fg-1)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-2)"; }}
+              >
+                <p.I size={14} style={{ color: "rgb(var(--accent-3))", marginTop: 2, flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{p.label}</span>
+              </button>
+            ))}
           </div>
         </div>
-      )}
+
+        <div className="card">
+          <div className="card-header"><h3 className="h3">Aria can access</h3></div>
+          <div className="col" style={{ padding: 4 }}>
+            {[
+              { I: IconMail,      label: "Email automation",  note: "Active" },
+              { I: IconPhone,     label: "Call automation",   note: "Active" },
+              { I: IconUsers,     label: "ATS & Interviews",  note: "Active" },
+              { I: IconCalendar,  label: "Leave management",  note: "Active" },
+              { I: IconBarChart,  label: "HR Analytics",      note: "Live"   },
+              { I: IconBriefcase, label: "Job postings",      note: "Active" },
+            ].map((c, i) => (
+              <div key={i} className="row gap-3" style={{ padding: "8px 12px", borderTop: i > 0 ? "1px solid var(--hairline)" : "none" }}>
+                <c.I size={14} style={{ color: "rgb(var(--accent-3))", flexShrink: 0 }} />
+                <span style={{ flex: 1, fontSize: 12, color: "var(--fg-1)" }}>{c.label}</span>
+                <span style={{ fontSize: 10.5, color: "var(--fg-3)" }}>{c.note}</span>
+                <span className="dot dot-success" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card" style={{ background: "linear-gradient(180deg, rgba(var(--accent), 0.05), rgba(255,255,255,0.01))", border: "1px solid rgba(var(--accent), 0.2)" }}>
+          <div className="card-body" style={{ padding: 16 }}>
+            <div className="label-accent" style={{ marginBottom: 8 }}>Aria's notes</div>
+            <div style={{ fontSize: 12.5, color: "var(--fg-2)", lineHeight: 1.55 }}>
+              All 9 AI co-worker features are active. Use the sidebar to navigate between Email, Calls, Posts, ATS, Interviews, Attendance, Leave, and Analytics.
+            </div>
+            <button className="btn btn-sm" style={{ marginTop: 12 }} onClick={() => send("What are all the features in this system and how can I use them?")}>
+              <IconSparkles size={12} />Show me the features
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// ── OrbWrapper ────────────────────────────────────────────────────────────────
-function OrbWrapper({ beatPulse, beatRef, size, floats }) {
-  return (
-    <div
-      className="chat-d0"
-      style={{
-        width: size, height: size, position: "relative",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        animation: floats
-          ? "chatFade 0.6s ease forwards, chatOrbFloat 3.5s ease-in-out infinite"
-          : "chatFade 0.6s ease forwards",
-      }}
-    >
-      {beatPulse > 0 && (
-        <>
-          <div key={`r1-${beatPulse}`} style={{ position: "absolute", width: size, height: size, borderRadius: "50%", border: "2px solid rgba(251,191,36,0.85)", animation: "chatOrbRing 0.75s cubic-bezier(0.2,0.6,0.4,1) forwards", pointerEvents: "none" }} />
-          <div key={`r2-${beatPulse}`} style={{ position: "absolute", width: size, height: size, borderRadius: "50%", border: "1.5px solid rgba(245,158,11,0.55)", animation: "chatOrbRing2 0.6s cubic-bezier(0.2,0.6,0.4,1) 0.08s forwards", pointerEvents: "none" }} />
-        </>
-      )}
-      <GoldOrb size={size} />
-    </div>
-  );
-}
-
-function GoldOrb({ size }) {
+// ── AriaOrb — CSS accent-colored orb ─────────────────────────────────────────
+function AriaOrb({ size, active, pulse }) {
   return (
     <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: "radial-gradient(circle at 35% 35%, #fde68a, #f59e0b 45%, #92400e 80%, #1c0700)",
-      boxShadow: "0 0 40px rgba(251,191,36,0.5), 0 0 80px rgba(245,158,11,0.25), inset 0 0 20px rgba(255,255,255,0.15)",
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: `radial-gradient(circle at 35% 30%, rgba(var(--accent-3), 0.95), rgba(var(--accent), 0.75) 50%, rgba(var(--accent-2), 0.35) 80%, transparent)`,
+      boxShadow: active
+        ? `0 0 ${size * 0.5}px rgba(var(--accent), 0.7), 0 0 ${size}px rgba(var(--accent), 0.35)`
+        : pulse
+          ? undefined
+          : `0 0 ${size * 0.25}px rgba(var(--accent), 0.35)`,
+      animation: active ? "chatOrbPulse 1.2s ease-in-out infinite" : pulse ? "chatOrbPulse 2.8s ease-in-out infinite" : "none",
+      transition: "box-shadow 0.3s ease",
     }} />
   );
 }
 
-// ── PremiumInput ──────────────────────────────────────────────────────────────
-function PremiumInput({ inputVal, setInputVal, onSend }) {
+// ── ChatInput — spinning border ───────────────────────────────────────────────
+function ChatInput({ value, onChange, onSend }) {
   const [listening, setListening] = React.useState(false);
   const voiceRef = React.useRef(null);
   const inputRef = React.useRef(null);
@@ -391,15 +329,15 @@ function PremiumInput({ inputVal, setInputVal, onSend }) {
       rec.continuous = true;
       rec.interimResults = true;
       rec.lang = "en-US";
-      let finalText = inputVal;
+      let final = value;
       rec.onresult = (e) => {
         let interim = "", newFinal = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
           if (e.results[i].isFinal) newFinal += e.results[i][0].transcript;
           else interim += e.results[i][0].transcript;
         }
-        if (newFinal) { finalText = (finalText + " " + newFinal).trim(); setInputVal(finalText); }
-        else setInputVal((finalText + " " + interim).trim());
+        if (newFinal) { final = (final + " " + newFinal).trim(); onChange(final); }
+        else onChange((final + " " + interim).trim());
       };
       rec.onerror = () => { setListening(false); voiceRef.current = null; };
       rec.onend = () => { setListening(false); voiceRef.current = null; inputRef.current?.focus(); };
@@ -409,47 +347,57 @@ function PremiumInput({ inputVal, setInputVal, onSend }) {
   }
 
   return (
-    <div style={{ width: "100%", position: "relative" }}>
-      <div style={{ borderRadius: 16, padding: "1.5px", position: "relative" }}>
-        {/* Spinning gold border */}
-        <div style={{ position: "absolute", inset: 0, borderRadius: 16, overflow: "hidden", pointerEvents: "none" }}>
-          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 0deg, transparent 0deg, rgba(251,191,36,0.9) 40deg, rgba(245,158,11,1) 80deg, rgba(253,230,138,0.8) 120deg, transparent 160deg, transparent 200deg, rgba(245,158,11,0.7) 240deg, rgba(251,191,36,0.9) 280deg, transparent 320deg)", animation: "chatBorderSpin 3.5s linear infinite" }} />
+    <div style={{ position: "relative" }}>
+      {/* Spinning accent border */}
+      <div style={{ borderRadius: 14, padding: "1.5px", position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0, borderRadius: 14, overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 0deg, transparent 0deg, rgba(var(--accent),0.85) 40deg, rgba(var(--accent-3),0.9) 80deg, transparent 140deg, transparent 200deg, rgba(var(--accent-2),0.7) 250deg, rgba(var(--accent),0.85) 290deg, transparent 330deg)", animation: "chatSpinBorder 4s linear infinite" }} />
         </div>
-        <div style={{ position: "absolute", inset: 0, borderRadius: 16, overflow: "hidden", pointerEvents: "none" }}>
-          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 180deg, transparent 0deg, rgba(168,85,247,0.5) 50deg, rgba(251,191,36,0.4) 90deg, transparent 130deg)", animation: "chatBorderSpinRev 5.5s linear infinite" }} />
+        <div style={{ position: "absolute", inset: 0, borderRadius: 14, overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", inset: "-80%", background: "conic-gradient(from 180deg, transparent 0deg, rgba(var(--accent-2),0.45) 60deg, rgba(var(--accent),0.35) 100deg, transparent 140deg)", animation: "chatSpinBorderRev 6s linear infinite" }} />
         </div>
-        <div style={{ position: "absolute", inset: 0, borderRadius: 16, pointerEvents: "none", boxShadow: "0 0 20px 3px rgba(251,191,36,0.3), 0 0 50px 6px rgba(245,158,11,0.15)", animation: "chatGoldPulse 3s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", inset: 0, borderRadius: 14, pointerEvents: "none", animation: "chatGlowPulse 3s ease-in-out infinite" }} />
 
-        <div style={{ borderRadius: 14, overflow: "hidden", background: "#0a0812", position: "relative" }}>
-          {/* Header strip */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid rgba(251,191,36,0.08)", background: "#0f0d14" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, color: "#f59e0b" }}>♛</span>
-              <span style={{ fontSize: 11, color: "rgba(251,191,36,0.6)" }}>Premium AI · Aria v4.2</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", display: "inline-block" }} />
-              <span style={{ fontSize: 11, color: "rgba(251,191,36,0.5)" }}>Active</span>
-            </div>
-          </div>
-
-          {/* Input row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", background: "#0f0d14" }}>
-            <GoldPlusBtn />
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputVal}
-              onChange={e => setInputVal(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") onSend(); }}
-              placeholder={listening ? "Listening…" : "Ask Aria anything about your company…"}
-              style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "white", fontSize: 13.5, fontFamily: "inherit" }}
-            />
-            <button onClick={toggleVoice} title={listening ? "Stop" : "Voice input"} style={{ flexShrink: 0, padding: 6, borderRadius: 8, border: "none", cursor: "pointer", transition: "all 0.2s ease", color: listening ? "#ef4444" : "rgba(251,191,36,0.6)", background: listening ? "rgba(239,68,68,0.12)" : "transparent", animation: listening ? "chatGoldPulse 1s ease-in-out infinite" : "none" }}>
-              <IconMic size={17} />
+        <div style={{
+          display: "flex", gap: 8, background: "var(--bg-elev-1)",
+          borderRadius: 13, padding: "4px 4px 4px 14px",
+          position: "relative",
+        }}>
+          <textarea
+            ref={inputRef}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+            }}
+            placeholder={listening ? "Listening…" : "Ask Aria anything — emails, posts, candidates, analytics…"}
+            rows={1}
+            style={{
+              flex: 1, background: "transparent", border: "none", outline: "none",
+              color: "var(--fg-1)", fontFamily: "inherit", fontSize: 13.5,
+              padding: "10px 0", resize: "none", minHeight: 24, maxHeight: 100, lineHeight: 1.5,
+            }}
+          />
+          <div className="row gap-1" style={{ alignItems: "center", padding: 4 }}>
+            <button
+              className={`btn btn-icon btn-sm ${listening ? "btn-primary" : "btn-ghost"}`}
+              onClick={toggleVoice}
+              title={listening ? "Stop" : "Voice input"}
+            >
+              <IconMic size={14} />
             </button>
-            <button onClick={onSend} title="Send" style={{ flexShrink: 0, padding: 6, borderRadius: 8, border: "none", cursor: "pointer", background: "transparent", color: inputVal.trim() ? "#f59e0b" : "rgba(255,255,255,0.3)", transition: "color 0.2s ease" }}>
-              <IconSend size={18} />
+            <button
+              className="btn btn-icon btn-sm"
+              onClick={onSend}
+              disabled={!value.trim()}
+              style={{
+                background: value.trim() ? "linear-gradient(180deg, rgb(var(--accent)), rgb(var(--accent-2)))" : "var(--bg-elev-2)",
+                color: value.trim() ? "white" : "var(--fg-3)",
+                borderColor: value.trim() ? "rgba(var(--accent), 0.5)" : "var(--hairline)",
+                boxShadow: value.trim() ? "0 4px 16px -4px rgba(var(--accent), 0.6)" : "none",
+              }}
+            >
+              <IconSend size={14} />
             </button>
           </div>
         </div>
@@ -458,56 +406,103 @@ function PremiumInput({ inputVal, setInputVal, onSend }) {
   );
 }
 
-function GoldPlusBtn() {
-  const [hovered, setHovered] = React.useState(false);
+// ── ChatMessage ───────────────────────────────────────────────────────────────
+function ChatMessage({ m, editingId, editingText, setEditingId, setEditingText, onEditSave }) {
+  if (m.who === "ai") {
+    return (
+      <div className="row gap-3 chat-msg-in" style={{ alignItems: "flex-start" }}>
+        <AriaOrb size={28} active={false} />
+        <div style={{ maxWidth: "78%" }}>
+          <div style={{
+            background: "white",
+            border: "1px solid rgba(var(--accent), 0.12)",
+            borderRadius: 14, borderTopLeftRadius: 4,
+            overflow: "hidden",
+            boxShadow: m.error ? "none" : "0 2px 12px rgba(0,0,0,0.15)",
+          }}>
+            <div style={{ padding: "6px 12px", borderBottom: "1px solid rgba(0,0,0,0.06)", background: "rgba(var(--accent), 0.04)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: m.error ? "rgb(var(--danger))" : "rgb(var(--accent))" }}>
+                ✦ Aria
+              </span>
+              {!m.error && <InlineCopyBtn text={m.text} />}
+            </div>
+            <div style={{ padding: "12px 14px", background: "white" }}>
+              {m.error
+                ? <span style={{ fontSize: 13.5, color: "rgb(252,165,165)", lineHeight: 1.6 }}>{m.text}</span>
+                : <ChatMarkdown text={m.text} />
+              }
+            </div>
+          </div>
+          <div style={{ fontSize: 10.5, color: "var(--fg-4)", marginTop: 4, marginLeft: 4 }}>Aria · just now</div>
+        </div>
+      </div>
+    );
+  }
+
+  /* User message */
   return (
-    <button
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ flexShrink: 0, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, cursor: "pointer", transition: "all 0.25s ease", background: hovered ? "linear-gradient(135deg,rgba(245,158,11,0.4),rgba(234,88,12,0.35))" : "rgba(255,255,255,0.04)", border: hovered ? "1px solid rgba(251,191,36,0.8)" : "1px solid rgba(251,191,36,0.35)", color: hovered ? "#fbbf24" : "#d97706", boxShadow: hovered ? "0 0 14px rgba(251,191,36,0.6)" : "0 0 8px rgba(251,191,36,0.25)" }}
-    >
-      <IconPlus size={15} />
-    </button>
+    <div className="row gap-3 chat-msg-in chat-user-msg" style={{ alignItems: "flex-start", flexDirection: "row-reverse" }}>
+      <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, rgba(var(--accent), 0.5), rgba(var(--accent-2), 0.5))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "white", flexShrink: 0, marginTop: 2 }}>ME</div>
+      <div style={{ maxWidth: "78%", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+        {editingId === m.id ? (
+          <div style={{ width: "100%", minWidth: 220 }}>
+            <textarea
+              autoFocus
+              value={editingText}
+              onChange={e => setEditingText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onEditSave(m.id); }
+                if (e.key === "Escape") { setEditingId(null); setEditingText(""); }
+              }}
+              rows={Math.min(6, editingText.split("\n").length + 1)}
+              style={{ width: "100%", padding: "10px 14px", borderRadius: 14, fontSize: 13.5, lineHeight: 1.6, color: "var(--fg-1)", outline: "none", resize: "none", background: "var(--bg-elev-2)", border: "1px solid rgba(var(--accent), 0.4)", fontFamily: "inherit" }}
+            />
+            <div className="row gap-2" style={{ marginTop: 6, justifyContent: "flex-end" }}>
+              <button className="btn btn-sm btn-ghost" onClick={() => { setEditingId(null); setEditingText(""); }}>Cancel</button>
+              <button className="btn btn-sm btn-primary" onClick={() => onEditSave(m.id)}><IconSend size={11} /> Send</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ padding: "11px 15px", background: "rgba(var(--accent), 0.1)", border: "1px solid rgba(var(--accent), 0.22)", borderRadius: 14, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.6, color: "var(--fg-1)", whiteSpace: "pre-wrap" }}>
+              {m.text}
+            </div>
+            <div className="chat-action-btns row gap-1">
+              <button
+                onClick={() => { setEditingId(m.id); setEditingText(m.text); }}
+                style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", fontSize: 10, borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "none", color: "var(--fg-3)", cursor: "pointer" }}
+              >
+                <IconZap size={9} /> Edit
+              </button>
+              <InlineCopyBtn text={m.text} />
+            </div>
+          </>
+        )}
+        <div style={{ fontSize: 10.5, color: "var(--fg-4)", marginRight: 4 }}>You · just now</div>
+      </div>
+    </div>
   );
 }
 
-function SuggestionPill({ label, onClick }) {
-  const [hovered, setHovered] = React.useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 15px", borderRadius: 999, background: hovered ? "linear-gradient(135deg,#d97706,#ea580c)" : "linear-gradient(135deg,rgba(217,119,6,0.45),rgba(234,88,12,0.45))", border: hovered ? "1px solid rgba(251,191,36,0.8)" : "1px solid rgba(251,191,36,0.4)", color: "white", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 0.25s ease", whiteSpace: "nowrap", boxShadow: hovered ? "0 0 18px rgba(251,191,36,0.6)" : "0 0 10px rgba(251,191,36,0.2)" }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function GoldCopyBtn({ text, color, iconOnly }) {
+// ── InlineCopyBtn ─────────────────────────────────────────────────────────────
+function InlineCopyBtn({ text }) {
   const [copied, setCopied] = React.useState(false);
   function doCopy() {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
-  if (iconOnly) {
-    return (
-      <button onClick={doCopy} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, fontSize: 10, background: "rgba(255,255,255,0.04)", border: "none", color: copied ? "#34d399" : "#9ca3af", cursor: "pointer" }}>
-        {copied ? <IconCheck size={10} /> : <IconCopy size={10} />}
-        {copied ? "Copied" : "Copy"}
-      </button>
-    );
-  }
   return (
-    <button onClick={doCopy} style={{ padding: 4, borderRadius: 6, border: "none", cursor: "pointer", background: "transparent", color: copied ? (color || "#d97706") : "#9ca3af", transition: "color 0.2s ease" }}>
-      {copied ? <IconCheck size={11} /> : <IconCopy size={11} />}
+    <button onClick={doCopy} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", fontSize: 10, borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "none", color: copied ? "rgb(var(--success))" : "var(--fg-3)", cursor: "pointer", transition: "color 0.2s ease" }}>
+      {copied ? <IconCheck size={10} /> : <IconCopy size={10} />}
+      {copied ? "Copied" : "Copy"}
     </button>
   );
 }
 
 // ── ChatMarkdown ──────────────────────────────────────────────────────────────
-function ChatMarkdown({ text, accentColor, primaryColor }) {
+function ChatMarkdown({ text }) {
   if (!text) return null;
+  const accent = "#7c3aed";   // fallback for white AI bubble (CSS vars don't work on white bg)
+  const primary = "#6d28d9";
 
   function renderInline(raw) {
     const parts = [];
@@ -522,14 +517,8 @@ function ChatMarkdown({ text, accentColor, primaryColor }) {
       const ic = rest.match(/^([\s\S]*?)`([^`]+)`([\s\S]*)$/);
       if (ic && ic[1].length < rest.length) {
         if (ic[1]) parts.push(<span key={k++}>{ic[1]}</span>);
-        parts.push(<code key={k++} style={{ background: `${accentColor}18`, border: `1px solid ${accentColor}44`, borderRadius: 4, padding: "1px 6px", fontFamily: "monospace", fontSize: "0.82em", color: accentColor }}>{ic[2]}</code>);
+        parts.push(<code key={k++} style={{ background: "#f3f0ff", border: "1px solid #ddd4fe", borderRadius: 4, padding: "1px 6px", fontFamily: "monospace", fontSize: "0.82em", color: accent }}>{ic[2]}</code>);
         rest = ic[3]; continue;
-      }
-      const em = rest.match(/^([\s\S]*?)\*([^*]+)\*([\s\S]*)$/);
-      if (em && em[1].length < rest.length) {
-        if (em[1]) parts.push(<span key={k++}>{em[1]}</span>);
-        parts.push(<em key={k++} style={{ color: "#444", fontStyle: "italic" }}>{em[2]}</em>);
-        rest = em[3]; continue;
       }
       parts.push(<span key={k++}>{rest}</span>);
       break;
@@ -543,29 +532,28 @@ function ChatMarkdown({ text, accentColor, primaryColor }) {
       {blocks.map((block, bi) => {
         const t = block.trim();
         if (!t) return null;
-        if (/^[-*_]{3,}$/.test(t)) return <hr key={bi} style={{ border: "none", borderTop: `1px solid ${primaryColor}33`, margin: "4px 0" }} />;
         const cb = t.match(/^```(\w*)\n?([\s\S]*?)```$/);
         if (cb) {
           const lang = cb[1], code = cb[2].replace(/\n$/, "");
           return (
             <div key={bi}>
-              {lang && <div style={{ background: `${primaryColor}22`, borderRadius: "8px 8px 0 0", padding: "4px 12px", borderBottom: `1px solid ${primaryColor}33` }}><span style={{ fontSize: 10, fontWeight: 600, color: primaryColor, textTransform: "uppercase" }}>{lang}</span></div>}
-              <pre style={{ background: "#050508", borderRadius: lang ? "0 0 8px 8px" : 8, padding: "12px 14px", overflowX: "auto", border: `1px solid ${primaryColor}22`, fontFamily: "monospace", fontSize: 12.5, color: "#e2e8f0", lineHeight: 1.65, margin: 0 }}><code>{code}</code></pre>
+              {lang && <div style={{ background: "#f3f0ff", borderRadius: "8px 8px 0 0", padding: "3px 12px", borderBottom: "1px solid #e9d5ff" }}><span style={{ fontSize: 10, fontWeight: 600, color: primary, textTransform: "uppercase" }}>{lang}</span></div>}
+              <pre style={{ background: "#1e1b2e", borderRadius: lang ? "0 0 8px 8px" : 8, padding: "12px 14px", overflowX: "auto", fontFamily: "monospace", fontSize: 12.5, color: "#e2e8f0", lineHeight: 1.65, margin: 0 }}><code>{code}</code></pre>
             </div>
           );
         }
-        const h1 = t.match(/^# (.+)/); if (h1) return <h1 key={bi} style={{ fontSize: 20, fontWeight: 800, color: "#111", margin: "4px 0 6px" }}>{renderInline(h1[1])}</h1>;
-        const h2 = t.match(/^## (.+)/); if (h2) return <h2 key={bi} style={{ fontSize: 16, fontWeight: 700, color: "#222", margin: "2px 0 4px" }}>{renderInline(h2[1])}</h2>;
-        const h3 = t.match(/^### (.+)/); if (h3) return <h3 key={bi} style={{ fontSize: 14, fontWeight: 700, color: primaryColor, margin: "2px 0" }}>{renderInline(h3[1])}</h3>;
+        const h1 = t.match(/^# (.+)/); if (h1) return <h1 key={bi} style={{ fontSize: 18, fontWeight: 800, color: "#111", margin: "2px 0 4px" }}>{renderInline(h1[1])}</h1>;
+        const h2 = t.match(/^## (.+)/); if (h2) return <h2 key={bi} style={{ fontSize: 15, fontWeight: 700, color: "#222", margin: "2px 0" }}>{renderInline(h2[1])}</h2>;
+        const h3 = t.match(/^### (.+)/); if (h3) return <h3 key={bi} style={{ fontSize: 13, fontWeight: 700, color: primary, margin: "2px 0" }}>{renderInline(h3[1])}</h3>;
         const lines = t.split("\n");
-        if (lines.every(l => /^[-*•]\s/.test(l.trim()))) return (
+        if (lines.length > 1 && lines.every(l => /^[-*•]\s/.test(l.trim()))) return (
           <ul key={bi} style={{ padding: 0, margin: 0, listStyleType: "none", display: "flex", flexDirection: "column", gap: 5 }}>
-            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}><span style={{ color: primaryColor, flexShrink: 0, marginTop: 1 }}>▸</span><span style={{ color: "#222", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^[-*•]\s/, ""))}</span></li>)}
+            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><span style={{ color: accent, flexShrink: 0, marginTop: 1 }}>▸</span><span style={{ color: "#1a1a1a", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^[-*•]\s/, ""))}</span></li>)}
           </ul>
         );
-        if (lines.every(l => /^\d+\.\s/.test(l.trim()))) return (
+        if (lines.length > 1 && lines.every(l => /^\d+\.\s/.test(l.trim()))) return (
           <ol key={bi} style={{ padding: 0, margin: 0, listStyleType: "none", display: "flex", flexDirection: "column", gap: 5 }}>
-            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 9 }}><span style={{ color: primaryColor, flexShrink: 0, fontWeight: 700, fontSize: 13, minWidth: 22, marginTop: 1 }}>{li + 1}.</span><span style={{ color: "#222", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^\d+\.\s/, ""))}</span></li>)}
+            {lines.map((l, li) => <li key={li} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><span style={{ color: accent, flexShrink: 0, fontWeight: 700, fontSize: 13, minWidth: 20, marginTop: 1 }}>{li + 1}.</span><span style={{ color: "#1a1a1a", lineHeight: 1.65 }}>{renderInline(l.trim().replace(/^\d+\.\s/, ""))}</span></li>)}
           </ol>
         );
         return (
@@ -578,87 +566,6 @@ function ChatMarkdown({ text, accentColor, primaryColor }) {
       })}
     </div>
   );
-}
-
-// ── ChatCanvas (particle background) ─────────────────────────────────────────
-function ChatCanvas() {
-  const canvasRef = React.useRef(null);
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    let animId;
-    let W = canvas.offsetWidth, H = canvas.offsetHeight;
-    canvas.width = W; canvas.height = H;
-    const COLORS = [
-      { hex: "#f59e0b", rgb: "245,158,11" }, { hex: "#fbbf24", rgb: "251,191,36" },
-      { hex: "#d97706", rgb: "217,119,6" }, { hex: "#8b5cf6", rgb: "139,92,246" },
-      { hex: "#c4b5fd", rgb: "196,181,253" }, { hex: "#a78bfa", rgb: "167,139,250" },
-    ];
-    const nodes = Array.from({ length: 72 }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.45, vy: (Math.random() - 0.5) * 0.45,
-      r: Math.random() * 1.8 + 0.8,
-      colorIdx: Math.floor(Math.random() * COLORS.length),
-      phase: Math.random() * Math.PI * 2, phaseSpeed: 0.012 + Math.random() * 0.018,
-    }));
-    const streaks = [];
-    let streakTimer = 0;
-    function spawnStreak() {
-      const edge = Math.random();
-      let x, y, vx, vy;
-      if (edge < 0.5) { x = Math.random() * W; y = 0; vx = (Math.random() - 0.5) * 3; vy = 1.5 + Math.random() * 2; }
-      else { x = 0; y = Math.random() * H; vx = 1.5 + Math.random() * 2; vy = (Math.random() - 0.5) * 3; }
-      streaks.push({ x, y, vx, vy, life: 60 + Math.random() * 60, maxLife: 60 + Math.random() * 60 });
-    }
-    function draw() {
-      ctx.clearRect(0, 0, W, H);
-      streakTimer++;
-      if (streakTimer > 120 && Math.random() < 0.015) { spawnStreak(); streakTimer = 0; }
-      for (let i = streaks.length - 1; i >= 0; i--) {
-        const s = streaks[i], alpha = (s.life / s.maxLife) * 0.7, tl = 60;
-        const g = ctx.createLinearGradient(s.x - s.vx * tl, s.y - s.vy * tl, s.x, s.y);
-        g.addColorStop(0, "rgba(251,191,36,0)"); g.addColorStop(1, `rgba(251,191,36,${alpha})`);
-        ctx.beginPath(); ctx.moveTo(s.x - s.vx * tl, s.y - s.vy * tl); ctx.lineTo(s.x, s.y);
-        ctx.strokeStyle = g; ctx.lineWidth = 1.5; ctx.stroke();
-        s.x += s.vx; s.y += s.vy; s.life--;
-        if (s.life <= 0 || s.x > W + 100 || s.y > H + 100) streaks.splice(i, 1);
-      }
-      for (const n of nodes) {
-        n.x += n.vx; n.y += n.vy; n.phase += n.phaseSpeed;
-        if (n.x < 0) { n.x = 0; n.vx *= -1; } if (n.x > W) { n.x = W; n.vx *= -1; }
-        if (n.y < 0) { n.y = 0; n.vy *= -1; } if (n.y > H) { n.y = H; n.vy *= -1; }
-      }
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 160) {
-            const a = (1 - dist / 160) * 0.3;
-            const g = ctx.createLinearGradient(nodes[i].x, nodes[i].y, nodes[j].x, nodes[j].y);
-            g.addColorStop(0, `rgba(251,191,36,${a})`); g.addColorStop(1, `rgba(245,158,11,${a * 0.6})`);
-            ctx.beginPath(); ctx.moveTo(nodes[i].x, nodes[i].y); ctx.lineTo(nodes[j].x, nodes[j].y);
-            ctx.strokeStyle = g; ctx.lineWidth = 0.7; ctx.stroke();
-          }
-        }
-      }
-      for (const n of nodes) {
-        const pulse = Math.sin(n.phase) * 0.5 + 0.5, r = n.r + pulse * 2, alpha = 0.5 + pulse * 0.5;
-        const { hex, rgb } = COLORS[n.colorIdx];
-        const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 5);
-        glow.addColorStop(0, `rgba(${rgb},${alpha * 0.45})`); glow.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.beginPath(); ctx.arc(n.x, n.y, r * 5, 0, Math.PI * 2); ctx.fillStyle = glow; ctx.fill();
-        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.globalAlpha = alpha; ctx.fillStyle = hex; ctx.fill(); ctx.globalAlpha = 1;
-      }
-      animId = requestAnimationFrame(draw);
-    }
-    draw();
-    function onResize() { W = canvas.offsetWidth; H = canvas.offsetHeight; canvas.width = W; canvas.height = H; }
-    window.addEventListener("resize", onResize);
-    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", onResize); };
-  }, []);
-  return <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none", opacity: 0.65 }} />;
 }
 
 Object.assign(window, { ChatPage });
