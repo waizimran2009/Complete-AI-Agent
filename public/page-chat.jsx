@@ -21,14 +21,14 @@ const SUGGESTION_PILLS = [
 ];
 
 const FEMALE_VOICES = [
-  "Samantha","Karen","Victoria","Moira","Fiona",
-  "Google UK English Female","Microsoft Aria Online (Natural)",
-  "Microsoft Jenny Online (Natural)","Microsoft Zira","Google US English",
+  "Microsoft Sonia Online (Natural)","Microsoft Libby Online (Natural)",
+  "Microsoft Maisie Online (Natural)","Microsoft Ava Online (Natural)",
+  "Google UK English Female","Moira","Fiona","Victoria","Karen","Samantha",
 ];
 const MALE_VOICES = [
-  "Google UK English Male","Microsoft Guy Online (Natural)",
-  "Microsoft Mark Online (Natural)","Microsoft David Online (Natural)",
-  "Daniel","Oliver","Thomas","Alex","Fred","Google US English Male",
+  "Microsoft Ryan Online (Natural)","Microsoft Davis Online (Natural)",
+  "Microsoft Abbi Online (Natural)","Microsoft Alfie Online (Natural)",
+  "Google UK English Male","Daniel","Oliver","Thomas","Fred","Alex",
 ];
 
 function cleanForSpeech(text) {
