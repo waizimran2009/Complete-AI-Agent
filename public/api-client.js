@@ -42,6 +42,42 @@ window.ariaChat = async function(message, history) {
   return data.text || "";
 };
 
+// ── Chat session persistence ──────────────────────────
+window.chatSessions = {
+  async list() {
+    try {
+      const res = await window.apiFetch("/api/chat-sessions");
+      if (!res || !res.ok) return [];
+      return (await res.json()).sessions || [];
+    } catch { return []; }
+  },
+  async create() {
+    try {
+      const res = await window.apiFetch("/api/chat-sessions", { method: "POST", body: JSON.stringify({}) });
+      if (!res || !res.ok) return { id: `local-${Date.now()}`, title: "New Chat", created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      return (await res.json()).session;
+    } catch { return { id: `local-${Date.now()}`, title: "New Chat", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; }
+  },
+  async delete(id) {
+    try { await window.apiFetch(`/api/chat-sessions/${id}`, { method: "DELETE" }); } catch {}
+  },
+  async getMessages(id) {
+    try {
+      const res = await window.apiFetch(`/api/chat-sessions/${id}/messages`);
+      if (!res || !res.ok) return [];
+      return (await res.json()).messages || [];
+    } catch { return []; }
+  },
+  async saveMessages(id, messages, title) {
+    try {
+      await window.apiFetch(`/api/chat-sessions/${id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ messages, title: title || null }),
+      });
+    } catch {}
+  },
+};
+
 // ── Generic AI completion (backward compat) ───────────
 window.claude = {
   async complete(promptOrOptions) {

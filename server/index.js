@@ -36,8 +36,9 @@ app.use("/api/ats",        requireAuth, require("./routes/ats"));
 app.use("/api/interviews", requireAuth, require("./routes/interviews"));
 app.use("/api/attendance", requireAuth, require("./routes/attendance"));
 app.use("/api/leave",      requireAuth, require("./routes/leave"));
-app.use("/api/analytics",  requireAuth, require("./routes/analytics"));
-app.use("/api/employees",  requireAuth, require("./routes/employees"));
+app.use("/api/analytics",     requireAuth, require("./routes/analytics"));
+app.use("/api/employees",     requireAuth, require("./routes/employees"));
+app.use("/api/chat-sessions", requireAuth, require("./routes/chat-sessions"));
 
 // SPA fallback
 app.get("*", (req, res) => {

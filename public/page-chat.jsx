@@ -103,6 +103,91 @@ const CHAT_STYLES = `
 `;
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ChatHistorySidebar
+// ══════════════════════════════════════════════════════════════════════════════
+function ChatHistorySidebar({ sessions, activeId, onLoad, onNew, onDelete }) {
+  const [hoverId, setHoverId] = React.useState(null);
+
+  function dateLabel(iso) {
+    if (!iso) return "";
+    const diff = Math.floor((Date.now() - new Date(iso)) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    if (diff < 7)  return "This week";
+    if (diff < 30) return "This month";
+    return "Older";
+  }
+
+  // Group sessions by date bucket
+  const groups = [];
+  let lastLabel = null;
+  for (const s of sessions) {
+    const lbl = dateLabel(s.updated_at || s.created_at);
+    if (lbl !== lastLabel) { groups.push({ label: lbl, items: [] }); lastLabel = lbl; }
+    groups[groups.length - 1].items.push(s);
+  }
+
+  return (
+    <div style={{ width: 220, flexShrink: 0, background: "rgba(6,4,10,0.97)", borderRight: "1px solid rgba(139,92,246,0.12)", display: "flex", flexDirection: "column", zIndex: 10, position: "relative" }}>
+      {/* New Chat button */}
+      <div style={{ padding: "14px 10px 10px" }}>
+        <button
+          onClick={onNew}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.1)", color: "#a78bfa", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit", transition: "all .2s ease" }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(139,92,246,0.2)"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.6)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(139,92,246,0.1)"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.35)"; }}
+        >
+          <IconPlus size={13} /> New Chat
+        </button>
+      </div>
+
+      {/* Sessions list */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 6px 12px" }} className="pc-scroll">
+        {sessions.length === 0 && (
+          <div style={{ padding: "32px 12px", color: "rgba(255,255,255,0.18)", fontSize: 11, textAlign: "center", lineHeight: 1.6 }}>
+            No previous chats.<br />Start a conversation!
+          </div>
+        )}
+        {groups.map(g => (
+          <div key={g.label}>
+            <div style={{ padding: "10px 8px 4px", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)" }}>{g.label}</div>
+            {g.items.map(s => (
+              <div key={s.id} style={{ position: "relative", marginBottom: 1 }}
+                onMouseEnter={() => setHoverId(s.id)}
+                onMouseLeave={() => setHoverId(null)}
+              >
+                <button
+                  onClick={() => onLoad(s)}
+                  style={{ width: "100%", textAlign: "left", padding: "7px 28px 7px 10px", borderRadius: 8, border: "none", background: activeId === s.id ? "rgba(139,92,246,0.18)" : hoverId === s.id ? "rgba(255,255,255,0.04)" : "transparent", cursor: "pointer", fontFamily: "inherit", transition: "background .15s ease" }}
+                >
+                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: activeId === s.id ? 500 : 400, color: activeId === s.id ? "#c4b5fd" : "#9ca3af" }}>{s.title}</div>
+                </button>
+                {hoverId === s.id && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onDelete(s.id); }}
+                    title="Delete"
+                    style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, border: "none", background: "rgba(239,68,68,0.1)", color: "rgba(239,68,68,0.7)", cursor: "pointer" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.25)"; e.currentTarget.style.color = "#ef4444"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; e.currentTarget.style.color = "rgba(239,68,68,0.7)"; }}
+                  >
+                    <IconClose size={10} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(139,92,246,0.08)", fontSize: 9.5, color: "rgba(255,255,255,0.12)", textAlign: "center", letterSpacing: "0.06em" }}>
+        POWERED BY SUPABASE
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ChatPage
 // ══════════════════════════════════════════════════════════════════════════════
 function ChatPage() {
@@ -114,12 +199,21 @@ function ChatPage() {
   const [chatOpen,         setChatOpen]          = React.useState(false);
   const [voiceOrbOpen,     setVoiceOrbOpen]      = React.useState(false);
   const [wakewordReady,    setWakewordReady]     = React.useState(false);
+  // Session state
+  const [sessions,         setSessions]          = React.useState([]);
+  const [activeSessionId,  setActiveSessionId]   = React.useState(null);
+
   const voiceOrbOpenRef    = React.useRef(false);
   const wakewordRecRef     = React.useRef(null);
   const wakewordPausedRef  = React.useRef(false);
   const bottomRef          = React.useRef(null);
 
   React.useEffect(() => { voiceOrbOpenRef.current = voiceOrbOpen; }, [voiceOrbOpen]);
+
+  // Load chat sessions on mount
+  React.useEffect(() => {
+    window.chatSessions?.list().then(s => setSessions(s)).catch(() => {});
+  }, []);
 
   // Wakeword: "Hey Quantum" opens voice orb
   React.useEffect(() => {
@@ -170,11 +264,33 @@ function ChatPage() {
 
   function triggerBeat() { beatRef.current.intensity = 1.0; setBeatPulse(p => p + 1); }
 
+  function newChat() {
+    setMessages([]);
+    setChatOpen(false);
+    setActiveSessionId(null);
+    setInputVal("");
+  }
+
+  async function loadSession(session) {
+    const msgs = await window.chatSessions.getMessages(session.id);
+    setActiveSessionId(session.id);
+    setMessages(msgs.map((m, i) => ({ role: m.role, text: m.content, id: m.id || i })));
+    setChatOpen(msgs.length > 0);
+    setInputVal("");
+  }
+
+  async function deleteSession(id) {
+    await window.chatSessions.delete(id);
+    setSessions(prev => prev.filter(s => s.id !== id));
+    if (activeSessionId === id) newChat();
+  }
+
   async function sendMessage(text) {
     const trimmed = text.trim();
     if (!trimmed || isTyping) return;
 
     const uid = Date.now();
+    const isFirstMsg = messages.length === 0;
     const newMsgs = [...messages, { role: "user", text: trimmed, id: uid }];
     setMessages(newMsgs);
     setChatOpen(true);
@@ -182,184 +298,212 @@ function ChatPage() {
     setInputVal("");
     setIsTyping(true);
 
+    // Ensure a session exists
+    let sid = activeSessionId;
+    if (!sid) {
+      const session = await window.chatSessions.create();
+      sid = session.id;
+      setActiveSessionId(sid);
+      setSessions(prev => [session, ...prev]);
+    }
+
+    let reply = "";
     try {
       const history = newMsgs.slice(0, -1).map(m => ({
         role: m.role === "user" ? "user" : "model",
         content: m.text,
       }));
-      const reply = await window.ariaChat(trimmed, history);
-      setMessages(prev => [...prev, { role: "ai", text: reply.trim(), id: uid + 1 }]);
+      reply = (await window.ariaChat(trimmed, history)).trim();
+      setMessages(prev => [...prev, { role: "ai", text: reply, id: uid + 1 }]);
       triggerBeat();
     } catch {
-      setMessages(prev => [...prev, { role: "ai", text: "Sorry, something went wrong. Please try again.", id: uid + 1 }]);
+      reply = "Sorry, something went wrong. Please try again.";
+      setMessages(prev => [...prev, { role: "ai", text: reply, id: uid + 1 }]);
     } finally {
       setIsTyping(false);
     }
+
+    // Persist to Supabase
+    const title = isFirstMsg ? trimmed.slice(0, 60) + (trimmed.length > 60 ? "…" : "") : null;
+    window.chatSessions.saveMessages(sid, [
+      { role: "user", content: trimmed },
+      { role: "ai",  content: reply },
+    ], title);
+
+    // Update local session list
+    setSessions(prev => prev.map(s =>
+      s.id === sid
+        ? { ...s, updated_at: new Date().toISOString(), ...(isFirstMsg ? { title: title } : {}) }
+        : s
+    ).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)));
   }
 
   const handleSend = () => sendMessage(inputVal);
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 64px)", width: "100%", color: "white", fontFamily: "var(--font-sans)", overflow: "hidden", position: "relative", background: THEME.bg }}>
+    <div style={{ display: "flex", height: "calc(100vh - 64px)", width: "100%", color: "white", fontFamily: "var(--font-sans)", overflow: "hidden", background: THEME.bg }}>
       <style>{CHAT_STYLES}</style>
-      <PremiumCanvas />
 
-      {/* ── Top bar ── */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", zIndex: 20 }}>
-        <div>
+      {/* ── Chat History Sidebar ── */}
+      <ChatHistorySidebar
+        sessions={sessions}
+        activeId={activeSessionId}
+        onLoad={loadSession}
+        onNew={newChat}
+        onDelete={deleteSession}
+      />
+
+      {/* ── Main chat area ── */}
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <PremiumCanvas />
+
+        {/* ── Top bar ── */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "flex-start", padding: "16px 20px", zIndex: 20 }}>
           {chatOpen && (
             <button
-              onClick={() => { setChatOpen(false); setMessages([]); }}
+              onClick={newChat}
               style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.05)", color: "#9ca3af", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
             >
               <IconPlus size={12} /> New chat
             </button>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, border: "1px solid rgba(251,191,36,0.4)", background: "linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.1))", animation: "goldPulse 3s ease-in-out infinite" }}>
-          <span style={{ fontSize: 13, color: "#f59e0b" }}>♛</span>
-          <span className="pc-shimmer" style={{ fontSize: 13, fontWeight: 700 }}>Premium</span>
-        </div>
-      </div>
 
-      {/* ── Landing view ── */}
-      {!chatOpen && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px", position: "relative" }}>
-          <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle,rgba(99,102,241,0.12) 0%,transparent 70%)", top: "50%", left: "50%", transform: "translate(-50%,-62%)", pointerEvents: "none" }} />
+        {/* ── Landing view ── */}
+        {!chatOpen && (
+          <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px", position: "relative" }}>
+            <div style={{ position: "absolute", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle,rgba(99,102,241,0.12) 0%,transparent 70%)", top: "50%", left: "50%", transform: "translate(-50%,-62%)", pointerEvents: "none" }} />
 
-          <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={160} floats />
+            <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={160} floats />
 
-          <div className="pc-fade-d1" style={{ textAlign: "center", marginBottom: 12, marginTop: 0 }}>
-            <div style={{ fontSize: 28, fontWeight: 300, color: "#d1d5db", marginBottom: 4 }}>Good to See You!</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: "white" }}>
-              How Can I <span style={{ fontWeight: 700, fontStyle: "italic" }}>Help</span> You Today?
+            <div className="pc-fade-d1" style={{ textAlign: "center", marginBottom: 12, marginTop: 0 }}>
+              <div style={{ fontSize: 28, fontWeight: 300, color: "#d1d5db", marginBottom: 4 }}>Good to See You!</div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "white" }}>
+                How Can I <span style={{ fontWeight: 700, fontStyle: "italic" }}>Help</span> You Today?
+              </div>
+            </div>
+
+            <p className="pc-fade-d2" style={{ fontSize: 13, color: "#6b7280", marginBottom: 48, textAlign: "center" }}>
+              I'm available 24/7 for you, ask me anything.
+            </p>
+
+            <div className="pc-fade-d3" style={{ width: "100%", maxWidth: 576 }}>
+              <InputCard
+                inputVal={inputVal}
+                setInputVal={setInputVal}
+                onSend={handleSend}
+                onMic={() => setVoiceOrbOpen(true)}
+                onVoiceInputStart={() => { wakewordPausedRef.current = true; if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} } setWakewordReady(false); }}
+                onVoiceInputEnd={() => { wakewordPausedRef.current = false; }}
+              />
+            </div>
+
+            <div className="pc-fade-d4" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 576, marginTop: 16 }}>
+              {SUGGESTION_PILLS.map(p => (
+                <SuggestionPill key={p.label} Icon={p.Icon} label={p.label} onClick={() => sendMessage(p.label)} />
+              ))}
+            </div>
+
+            {wakewordReady && (
+              <div className="pc-fade-d4" style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 999, background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.15)" }}>
+                <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8 }}>
+                  <span className="pc-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(167,139,250,0.6)" }} />
+                  <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8, borderRadius: "50%", background: "#8b5cf6" }} />
+                </span>
+                <span style={{ fontSize: 11, color: "#6b7280", letterSpacing: "0.04em" }}>
+                  Say <span style={{ color: "#a78bfa", fontWeight: 500 }}>"Hey Quantum"</span> to open voice
+                </span>
+              </div>
+            )}
+
+            <div style={{ position: "absolute", bottom: 20, left: 0, right: 0, textAlign: "center", fontSize: 11, color: "#374151" }}>
+              Unlock new era with QuantuMania.
             </div>
           </div>
+        )}
 
-          <p className="pc-fade-d2" style={{ fontSize: 13, color: "#6b7280", marginBottom: 48, textAlign: "center" }}>
-            I'm available 24/7 for you, ask me anything.
-          </p>
-
-          <div className="pc-fade-d3" style={{ width: "100%", maxWidth: 576 }}>
-            <InputCard
-              inputVal={inputVal}
-              setInputVal={setInputVal}
-              onSend={handleSend}
-              onMic={() => setVoiceOrbOpen(true)}
-              onVoiceInputStart={() => { wakewordPausedRef.current = true; if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} } setWakewordReady(false); }}
-              onVoiceInputEnd={() => { wakewordPausedRef.current = false; }}
-            />
-          </div>
-
-          <div className="pc-fade-d4" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center", maxWidth: 576, marginTop: 16 }}>
-            {SUGGESTION_PILLS.map(p => (
-              <SuggestionPill key={p.label} Icon={p.Icon} label={p.label} onClick={() => sendMessage(p.label)} />
-            ))}
-          </div>
-
-          {wakewordReady && (
-            <div className="pc-fade-d4" style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 999, background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.15)" }}>
-              <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8 }}>
-                <span className="pc-ping" style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(167,139,250,0.6)" }} />
-                <span style={{ position: "relative", display: "inline-flex", width: 8, height: 8, borderRadius: "50%", background: "#8b5cf6" }} />
-              </span>
-              <span style={{ fontSize: 11, color: "#6b7280", letterSpacing: "0.04em" }}>
-                Say <span style={{ color: "#a78bfa", fontWeight: 500 }}>"Hey Quantum"</span> to open voice
-              </span>
+        {/* ── Chat view ── */}
+        {chatOpen && (
+          <div style={{ height: "100%", display: "flex", flexDirection: "column", paddingTop: 64, overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "center", paddingTop: 16, paddingBottom: 8, flexShrink: 0 }}>
+              <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={72} />
             </div>
-          )}
 
-          <div style={{ position: "absolute", bottom: 20, left: 0, right: 0, textAlign: "center", fontSize: 11, color: "#374151" }}>
-            Unlock new era with QuantuMania.
-          </div>
-        </div>
-      )}
-
-      {/* ── Chat view ── */}
-      {chatOpen && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingTop: 64, overflow: "hidden" }}>
-          <div style={{ display: "flex", justifyContent: "center", paddingTop: 16, paddingBottom: 8, flexShrink: 0 }}>
-            <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={72} />
-          </div>
-
-          <div className="pc-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 768, margin: "0 auto", boxSizing: "border-box" }}>
-            {messages.map(msg => (
-              <div key={msg.id} className="pc-msg-in" style={{ display: "flex", gap: 12, flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
-                {msg.role === "ai" && (
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${THEME.primary}22`, border: `1px solid ${THEME.primary}44`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                    <IconSparkles size={14} style={{ color: THEME.primary }} />
-                  </div>
-                )}
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "80%" }}>
-                  {msg.role === "user" ? (
-                    <div className="pc-user-msg" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                      <div style={{ padding: "10px 16px", borderRadius: 16, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.6, background: THEME.userBubble, boxShadow: "0 4px 20px rgba(99,102,241,0.25)", whiteSpace: "pre-wrap" }}>
-                        {msg.text}
-                      </div>
-                      <div className="pc-msg-actions" style={{ display: "flex", gap: 4 }}>
-                        <PCCopyButton text={msg.text} />
-                      </div>
+            <div className="pc-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 768, margin: "0 auto", boxSizing: "border-box" }}>
+              {messages.map(msg => (
+                <div key={msg.id} className="pc-msg-in" style={{ display: "flex", gap: 12, flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
+                  {msg.role === "ai" && (
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${THEME.primary}22`, border: `1px solid ${THEME.primary}44`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                      <IconSparkles size={14} style={{ color: THEME.primary }} />
                     </div>
-                  ) : (
-                    <div style={{ borderRadius: 16, borderTopLeftRadius: 4, overflow: "hidden", background: "#ffffff", border: `1px solid ${THEME.aiBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderBottom: "1px solid rgba(0,0,0,0.07)", background: `${THEME.primary}18` }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: THEME.primary }}>✦ QuantuMania AI</span>
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: msg.role === "user" ? "flex-end" : "flex-start", maxWidth: "80%" }}>
+                    {msg.role === "user" ? (
+                      <div className="pc-user-msg" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                        <div style={{ padding: "10px 16px", borderRadius: 16, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.6, background: THEME.userBubble, boxShadow: "0 4px 20px rgba(99,102,241,0.25)", whiteSpace: "pre-wrap" }}>
+                          {msg.text}
                         </div>
-                        <PCCopyButton text={msg.text} color={THEME.primary} />
+                        <div className="pc-msg-actions" style={{ display: "flex", gap: 4 }}>
+                          <PCCopyButton text={msg.text} />
+                        </div>
                       </div>
-                      <div style={{ padding: "14px 16px", background: "#ffffff" }}>
-                        <PCMarkdown text={msg.text} accentColor={THEME.primary} primaryColor={THEME.primary} />
+                    ) : (
+                      <div style={{ borderRadius: 16, borderTopLeftRadius: 4, overflow: "hidden", background: "#ffffff", border: `1px solid ${THEME.aiBorder}`, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderBottom: "1px solid rgba(0,0,0,0.07)", background: `${THEME.primary}18` }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: THEME.primary }}>✦ QuantuMania AI</span>
+                          <PCCopyButton text={msg.text} color={THEME.primary} />
+                        </div>
+                        <div style={{ padding: "14px 16px", background: "#ffffff" }}>
+                          <PCMarkdown text={msg.text} accentColor={THEME.primary} primaryColor={THEME.primary} />
+                        </div>
                       </div>
+                    )}
+                  </div>
+                  {msg.role === "user" && (
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2, fontSize: 11, fontWeight: 600, color: "#9ca3af" }}>
+                      ME
                     </div>
                   )}
                 </div>
+              ))}
 
-                {msg.role === "user" && (
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2, fontSize: 11, fontWeight: 600, color: "#9ca3af" }}>
-                    ME
+              {isTyping && (
+                <div className="pc-msg-in" style={{ display: "flex", gap: 12 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                    <IconSparkles size={13} style={{ color: "#818cf8" }} />
                   </div>
-                )}
-              </div>
-            ))}
-
-            {isTyping && (
-              <div className="pc-msg-in" style={{ display: "flex", gap: 12 }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
-                  <IconSparkles size={13} style={{ color: "#818cf8" }} />
+                  <div style={{ background: "#141418", border: "1px solid rgba(255,255,255,0.07)", padding: "12px 16px", borderRadius: 16, borderTopLeftRadius: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
+                    <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
+                    <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
+                  </div>
                 </div>
-                <div style={{ background: "#141418", border: "1px solid rgba(255,255,255,0.07)", padding: "12px 16px", borderRadius: 16, borderTopLeftRadius: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
-                  <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
-                  <span className="pc-typing-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#9ca3af", display: "inline-block" }} />
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
 
-          <div style={{ flexShrink: 0, padding: "0 24px 24px", maxWidth: 768, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
-            <InputCard
-              inputVal={inputVal}
-              setInputVal={setInputVal}
-              onSend={handleSend}
-              onMic={() => setVoiceOrbOpen(true)}
-              onVoiceInputStart={() => { wakewordPausedRef.current = true; if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} } setWakewordReady(false); }}
-              onVoiceInputEnd={() => { wakewordPausedRef.current = false; }}
-            />
+            <div style={{ flexShrink: 0, padding: "0 24px 24px", maxWidth: 768, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+              <InputCard
+                inputVal={inputVal}
+                setInputVal={setInputVal}
+                onSend={handleSend}
+                onMic={() => setVoiceOrbOpen(true)}
+                onVoiceInputStart={() => { wakewordPausedRef.current = true; if (wakewordRecRef.current) { try { wakewordRecRef.current.abort(); } catch {} } setWakewordReady(false); }}
+                onVoiceInputEnd={() => { wakewordPausedRef.current = false; }}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── Voice Orb Overlay ── */}
-      {voiceOrbOpen && (
-        <AIVoiceOrbOverlay
-          beatRef={beatRef}
-          beatPulse={beatPulse}
-          onClose={() => { stopSpeaking(); setVoiceOrbOpen(false); }}
-        />
-      )}
+        {/* ── Voice Orb Overlay ── */}
+        {voiceOrbOpen && (
+          <AIVoiceOrbOverlay
+            beatRef={beatRef}
+            beatPulse={beatPulse}
+            onClose={() => { stopSpeaking(); setVoiceOrbOpen(false); }}
+          />
+        )}
+      </div>
     </div>
   );
 }
