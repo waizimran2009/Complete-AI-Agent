@@ -105,7 +105,7 @@ const CHAT_STYLES = `
 // ══════════════════════════════════════════════════════════════════════════════
 // ChatHistorySidebar
 // ══════════════════════════════════════════════════════════════════════════════
-function ChatHistorySidebar({ sessions, activeId, onLoad, onNew, onDelete }) {
+function ChatHistorySidebar({ sessions, activeId, onLoad, onNew, onDelete, open, onToggle }) {
   const [hoverId, setHoverId] = React.useState(null);
 
   function dateLabel(iso) {
@@ -118,7 +118,6 @@ function ChatHistorySidebar({ sessions, activeId, onLoad, onNew, onDelete }) {
     return "Older";
   }
 
-  // Group sessions by date bucket
   const groups = [];
   let lastLabel = null;
   for (const s of sessions) {
@@ -127,61 +126,134 @@ function ChatHistorySidebar({ sessions, activeId, onLoad, onNew, onDelete }) {
     groups[groups.length - 1].items.push(s);
   }
 
-  return (
-    <div style={{ width: 220, flexShrink: 0, background: "rgba(6,4,10,0.97)", borderRight: "1px solid rgba(139,92,246,0.12)", display: "flex", flexDirection: "column", zIndex: 10, position: "relative" }}>
-      {/* New Chat button */}
-      <div style={{ padding: "14px 10px 10px" }}>
+  // ── Collapsed strip ──
+  if (!open) {
+    return (
+      <div style={{ width: 40, flexShrink: 0, background: "rgba(6,4,10,0.97)", borderRight: "1px solid rgba(139,92,246,0.12)", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 14, gap: 12, zIndex: 10 }}>
+        <button
+          onClick={onToggle}
+          title="Open chat history"
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.08)", color: "#a78bfa", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .2s ease" }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(139,92,246,0.2)"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.6)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(139,92,246,0.08)"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.3)"; }}
+        >
+          ▶
+        </button>
         <button
           onClick={onNew}
-          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(139,92,246,0.35)", background: "rgba(139,92,246,0.1)", color: "#a78bfa", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit", transition: "all .2s ease" }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(139,92,246,0.2)"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.6)"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "rgba(139,92,246,0.1)"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.35)"; }}
+          title="New chat"
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid rgba(139,92,246,0.2)", background: "transparent", color: "rgba(167,139,250,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .2s ease" }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(139,92,246,0.15)"; e.currentTarget.style.color = "#a78bfa"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(167,139,250,0.5)"; }}
         >
-          <IconPlus size={13} /> New Chat
+          <IconPlus size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  // ── Expanded sidebar ──
+  return (
+    <div style={{ width: 240, flexShrink: 0, background: "linear-gradient(180deg,rgba(10,6,18,0.98) 0%,rgba(6,4,12,0.99) 100%)", borderRight: "1px solid rgba(139,92,246,0.15)", display: "flex", flexDirection: "column", zIndex: 10, position: "relative" }}>
+
+      {/* Purple glow at top */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 80, background: "radial-gradient(ellipse at 50% 0%,rgba(139,92,246,0.18) 0%,transparent 70%)", pointerEvents: "none" }} />
+
+      {/* Header */}
+      <div style={{ padding: "14px 12px 10px", display: "flex", alignItems: "center", gap: 8, position: "relative" }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 6, background: "linear-gradient(135deg,rgba(139,92,246,0.4),rgba(99,102,241,0.3))", border: "1px solid rgba(139,92,246,0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <IconSparkles size={11} style={{ color: "#a78bfa" }} />
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "rgba(196,181,253,0.8)", textTransform: "uppercase" }}>Chat History</span>
+        </div>
+        <button
+          onClick={onToggle}
+          title="Collapse"
+          style={{ width: 24, height: 24, borderRadius: 6, border: "1px solid rgba(139,92,246,0.2)", background: "transparent", color: "rgba(167,139,250,0.45)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, transition: "all .2s ease" }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(139,92,246,0.15)"; e.currentTarget.style.color = "#a78bfa"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(167,139,250,0.45)"; }}
+        >
+          ◀
         </button>
       </div>
 
+      {/* New Chat button */}
+      <div style={{ padding: "0 10px 10px" }}>
+        <button
+          onClick={onNew}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", borderRadius: 10, border: "1px solid rgba(139,92,246,0.4)", background: "linear-gradient(135deg,rgba(139,92,246,0.12),rgba(99,102,241,0.08))", color: "#c4b5fd", cursor: "pointer", fontSize: 12, fontWeight: 500, fontFamily: "inherit", transition: "all .2s ease", boxShadow: "0 0 16px rgba(139,92,246,0.08)" }}
+          onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(139,92,246,0.25),rgba(99,102,241,0.18))"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.7)"; e.currentTarget.style.boxShadow = "0 0 20px rgba(139,92,246,0.2)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg,rgba(139,92,246,0.12),rgba(99,102,241,0.08))"; e.currentTarget.style.borderColor = "rgba(139,92,246,0.4)"; e.currentTarget.style.boxShadow = "0 0 16px rgba(139,92,246,0.08)"; }}
+        >
+          <div style={{ width: 18, height: 18, borderRadius: 5, background: "rgba(139,92,246,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <IconPlus size={11} />
+          </div>
+          New Chat
+        </button>
+      </div>
+
+      {/* Divider */}
+      <div style={{ margin: "0 10px 4px", height: 1, background: "linear-gradient(90deg,transparent,rgba(139,92,246,0.25),transparent)" }} />
+
       {/* Sessions list */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 6px 12px" }} className="pc-scroll">
+      <div style={{ flex: 1, overflowY: "auto", padding: "6px 6px 12px" }} className="pc-scroll">
         {sessions.length === 0 && (
-          <div style={{ padding: "32px 12px", color: "rgba(255,255,255,0.18)", fontSize: 11, textAlign: "center", lineHeight: 1.6 }}>
-            No previous chats.<br />Start a conversation!
+          <div style={{ padding: "40px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <IconSparkles size={18} style={{ color: "rgba(139,92,246,0.4)" }} />
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, textAlign: "center", lineHeight: 1.6 }}>
+              No previous chats.<br />Start a conversation!
+            </div>
           </div>
         )}
         {groups.map(g => (
           <div key={g.label}>
-            <div style={{ padding: "10px 8px 4px", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.2)" }}>{g.label}</div>
-            {g.items.map(s => (
-              <div key={s.id} style={{ position: "relative", marginBottom: 1 }}
-                onMouseEnter={() => setHoverId(s.id)}
-                onMouseLeave={() => setHoverId(null)}
-              >
-                <button
-                  onClick={() => onLoad(s)}
-                  style={{ width: "100%", textAlign: "left", padding: "7px 28px 7px 10px", borderRadius: 8, border: "none", background: activeId === s.id ? "rgba(139,92,246,0.18)" : hoverId === s.id ? "rgba(255,255,255,0.04)" : "transparent", cursor: "pointer", fontFamily: "inherit", transition: "background .15s ease" }}
+            <div style={{ padding: "10px 10px 5px", display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ flex: 1, height: 1, background: "rgba(139,92,246,0.12)" }} />
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(167,139,250,0.35)", whiteSpace: "nowrap" }}>{g.label}</span>
+              <div style={{ flex: 1, height: 1, background: "rgba(139,92,246,0.12)" }} />
+            </div>
+            {g.items.map(s => {
+              const isActive = activeId === s.id;
+              const isHov = hoverId === s.id;
+              return (
+                <div key={s.id} style={{ position: "relative", marginBottom: 2 }}
+                  onMouseEnter={() => setHoverId(s.id)}
+                  onMouseLeave={() => setHoverId(null)}
                 >
-                  <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: activeId === s.id ? 500 : 400, color: activeId === s.id ? "#c4b5fd" : "#9ca3af" }}>{s.title}</div>
-                </button>
-                {hoverId === s.id && (
                   <button
-                    onClick={e => { e.stopPropagation(); onDelete(s.id); }}
-                    title="Delete"
-                    style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, border: "none", background: "rgba(239,68,68,0.1)", color: "rgba(239,68,68,0.7)", cursor: "pointer" }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.25)"; e.currentTarget.style.color = "#ef4444"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; e.currentTarget.style.color = "rgba(239,68,68,0.7)"; }}
+                    onClick={() => onLoad(s)}
+                    style={{ width: "100%", textAlign: "left", padding: "8px 30px 8px 10px", borderRadius: 9, border: `1px solid ${isActive ? "rgba(139,92,246,0.4)" : "transparent"}`, background: isActive ? "linear-gradient(135deg,rgba(139,92,246,0.2),rgba(99,102,241,0.12))" : isHov ? "rgba(255,255,255,0.04)" : "transparent", cursor: "pointer", fontFamily: "inherit", transition: "all .15s ease", boxShadow: isActive ? "0 0 12px rgba(139,92,246,0.15)" : "none" }}
                   >
-                    <IconClose size={10} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      {isActive && <div style={{ width: 3, height: 14, borderRadius: 2, background: "linear-gradient(180deg,#a78bfa,#6366f1)", flexShrink: 0 }} />}
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: isActive ? 500 : 400, color: isActive ? "#e2d9ff" : isHov ? "#d1d5db" : "#9ca3af" }}>{s.title}</div>
+                    </div>
                   </button>
-                )}
-              </div>
-            ))}
+                  {isHov && (
+                    <button
+                      onClick={e => { e.stopPropagation(); onDelete(s.id); }}
+                      title="Delete"
+                      style={{ position: "absolute", right: 5, top: "50%", transform: "translateY(-50%)", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 5, border: "none", background: "rgba(239,68,68,0.12)", color: "rgba(239,68,68,0.65)", cursor: "pointer", transition: "all .15s ease" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.28)"; e.currentTarget.style.color = "#ef4444"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "rgba(239,68,68,0.65)"; }}
+                    >
+                      <IconClose size={9} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(139,92,246,0.08)", fontSize: 9.5, color: "rgba(255,255,255,0.12)", textAlign: "center", letterSpacing: "0.06em" }}>
-        POWERED BY SUPABASE
+      <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(139,92,246,0.1)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "rgba(52,211,153,0.7)", boxShadow: "0 0 6px rgba(52,211,153,0.5)" }} />
+        <span style={{ fontSize: 9.5, color: "rgba(255,255,255,0.18)", letterSpacing: "0.08em" }}>SUPABASE SYNC ACTIVE</span>
       </div>
     </div>
   );
@@ -202,6 +274,7 @@ function ChatPage() {
   // Session state
   const [sessions,         setSessions]          = React.useState([]);
   const [activeSessionId,  setActiveSessionId]   = React.useState(null);
+  const [chatHistoryOpen,  setChatHistoryOpen]   = React.useState(true);
 
   const voiceOrbOpenRef    = React.useRef(false);
   const wakewordRecRef     = React.useRef(null);
@@ -351,6 +424,8 @@ function ChatPage() {
         onLoad={loadSession}
         onNew={newChat}
         onDelete={deleteSession}
+        open={chatHistoryOpen}
+        onToggle={() => setChatHistoryOpen(o => !o)}
       />
 
       {/* ── Main chat area ── */}

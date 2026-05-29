@@ -362,42 +362,6 @@ function TopBar({ title, subtitle, theme, setTheme, rightSlot }) {
         </div>
       </div>
 
-      {/* Search */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        height: 36,
-        width: 280,
-        padding: "0 12px",
-        background: "var(--bg-elev-1)",
-        border: "1px solid var(--hairline)",
-        borderRadius: "var(--r-md)",
-        color: "var(--fg-3)",
-      }}>
-        <IconSearch size={15} />
-        <input
-          placeholder="Search across calls, emails, candidates…"
-          style={{
-            flex: 1,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: "var(--fg-1)",
-            fontSize: 12.5,
-            fontFamily: "inherit",
-          }}
-        />
-        <span className="mono" style={{
-          fontSize: 10,
-          padding: "1px 5px",
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid var(--hairline)",
-          borderRadius: 4,
-          color: "var(--fg-3)",
-        }}>⌘K</span>
-      </div>
-
       {rightSlot}
 
       {/* Theme button */}
