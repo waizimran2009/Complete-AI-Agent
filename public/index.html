@@ -117,7 +117,7 @@
             </button>
           )}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-            <TopBar title={page === "chat" ? "" : meta.title} subtitle={page === "chat" ? "" : meta.sub} theme={theme} setTheme={setTheme} />
+            {page !== "chat" && <TopBar title={meta.title} subtitle={meta.sub} theme={theme} setTheme={setTheme} />}
             <main key={navKey} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
               {page !== "chat" && <PageIntro kind={page} label={meta.title} sublabel={meta.sub} k={navKey} />}
               <div className={`ambient-${page}`} />

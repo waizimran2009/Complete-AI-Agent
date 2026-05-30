@@ -414,7 +414,7 @@ function ChatPage() {
   const handleSend = () => sendMessage(inputVal);
 
   return (
-    <div style={{ display: "flex", height: "calc(100vh - 64px)", width: "100%", color: "white", fontFamily: "var(--font-sans)", overflow: "hidden", background: THEME.bg }}>
+    <div style={{ display: "flex", height: "100vh", width: "100%", color: "white", fontFamily: "var(--font-sans)", overflow: "hidden", background: THEME.bg }}>
       <style>{CHAT_STYLES}</style>
 
       {/* ── Chat History Sidebar ── */}
