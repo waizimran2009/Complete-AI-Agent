@@ -500,7 +500,7 @@ function ChatPage() {
         {/* ── Chat view ── */}
         {chatOpen && (
           <div style={{ height: "100%", display: "flex", flexDirection: "column", paddingTop: 64, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: chatHistoryOpen ? "center" : "flex-start", paddingTop: 16, paddingBottom: 8, paddingLeft: chatHistoryOpen ? 0 : 32, flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "center", paddingTop: 16, paddingBottom: 8, flexShrink: 0 }}>
               <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={72} />
             </div>
 
