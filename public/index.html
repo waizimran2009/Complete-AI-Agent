@@ -82,14 +82,14 @@
 
       const meta = PAGE_META[page] || { title: "", sub: "" };
 
-      // Step 1: Auth gate
-      if (!authDone) {
-        return <LoginPage onLogin={() => setAuthDone(true)} />;
-      }
-
-      // Step 2: Launch screen
+      // Step 1: Launch screen (plays first on every load)
       if (!booted) {
         return <LaunchScreen onEnter={() => setBooted(true)} />;
+      }
+
+      // Step 2: Auth gate (shown after launch animation ends)
+      if (!authDone) {
+        return <LoginPage onLogin={() => setAuthDone(true)} />;
       }
 
       // Step 3: Main app
