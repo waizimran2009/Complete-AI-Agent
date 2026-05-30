@@ -274,7 +274,7 @@ function ChatPage() {
   // Session state
   const [sessions,         setSessions]          = React.useState([]);
   const [activeSessionId,  setActiveSessionId]   = React.useState(null);
-  const [chatHistoryOpen,  setChatHistoryOpen]   = React.useState(true);
+  const [chatHistoryOpen,  setChatHistoryOpen]   = React.useState(window.innerWidth >= 768);
 
   const voiceOrbOpenRef    = React.useRef(false);
   const wakewordRecRef     = React.useRef(null);

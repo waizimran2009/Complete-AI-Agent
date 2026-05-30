@@ -3,6 +3,8 @@
    ─────────────────────────────────────────── */
 
 function OverviewPage({ navigate }) {
+  const { isMobile, isTablet } = useBreakpoint();
+  const stackLayout = isMobile || isTablet;
   const [tick, setTick] = React.useState(0);
   React.useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 2400);
@@ -30,7 +32,7 @@ function OverviewPage({ navigate }) {
   ];
 
   return (
-    <div className="col gap-6" style={{ padding: 24 }}>
+    <div className="col gap-6" style={{ padding: isMobile ? 14 : 24 }}>
       {/* Hero */}
       <div className="card card-glow" style={{ padding: 0, overflow: "hidden", position: "relative" }}>
         <div className="grid-bg" />
@@ -39,35 +41,39 @@ function OverviewPage({ navigate }) {
           background: "radial-gradient(circle, rgba(var(--accent), 0.22), transparent 65%)",
           pointerEvents: "none",
         }} />
-        <div className="row" style={{ padding: 24, gap: 24, position: "relative", zIndex: 1 }}>
-          <div style={{ flexShrink: 0 }}>
-            <QuantumOrb size={104} intensity={0.4 + Math.sin(tick) * 0.15} />
-          </div>
+        <div style={{ padding: isMobile ? 16 : 24, gap: isMobile ? 14 : 24, position: "relative", zIndex: 1, display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }}>
+          {!isMobile && (
+            <div style={{ flexShrink: 0 }}>
+              <QuantumOrb size={104} intensity={0.4 + Math.sin(tick) * 0.15} />
+            </div>
+          )}
           <div className="col gap-2" style={{ flex: 1 }}>
             <span className="label-accent">Quantum Engine · Online</span>
-            <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, maxWidth: 540 }}>
+            <h2 style={{ fontSize: isMobile ? 18 : 24, fontWeight: 600, letterSpacing: "-0.02em", margin: 0, maxWidth: 540 }}>
               Good afternoon, Waiz. <span style={{ color: "var(--fg-3)" }}>4 things need your attention today.</span>
             </h2>
             <div className="row gap-3" style={{ marginTop: 6, flexWrap: "wrap" }}>
               <span className="pill pill-success"><span className="dot dot-success" />All systems nominal</span>
-              <span className="pill">Llama 3.1 70B · self-hosted</span>
+              {!isMobile && <span className="pill">Llama 3.1 70B · self-hosted</span>}
               <span className="pill">{stats ? `${stats.headcount || 0} employees` : "Loading..."}</span>
               <span className="pill">{stats ? `${(stats.emailsSent || 0) + (stats.callsHandled || 0)} ops today` : "..."}</span>
             </div>
           </div>
-          <div className="col gap-2">
+          <div className="col gap-2" style={{ alignSelf: isMobile ? "stretch" : "auto" }}>
             <button className="btn btn-primary" onClick={() => navigate("calls")}>
               <IconSparkles size={14} />Open AI Workspace
             </button>
-            <button className="btn btn-sm btn-ghost">
-              <IconFileText size={13} />Today's briefing
-            </button>
+            {!isMobile && (
+              <button className="btn btn-sm btn-ghost">
+                <IconFileText size={13} />Today's briefing
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: isMobile ? 8 : 16 }}>
         <StatCard label="Calls handled" value={loading ? "…" : String(stats?.callsHandled ?? 247)} sub="+18% vs last week" trend="up" icon={IconPhone} accent />
         <StatCard label="Emails sent"    value={loading ? "…" : String(stats?.emailsSent ?? 1492)} sub="+6% vs last week" trend="up" icon={IconMail} accent />
         <StatCard label="Posts live"     value={loading ? "…" : String(stats?.postsPublished ?? 38)} sub="142k impressions" trend="up" icon={IconLinkedIn} accent />
@@ -75,7 +81,7 @@ function OverviewPage({ navigate }) {
       </div>
 
       {/* Two columns: activity + feature shortcuts */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: stackLayout ? "1fr" : "1.4fr 1fr", gap: 16 }}>
         {/* Activity */}
         <div className="card">
           <div className="card-header">

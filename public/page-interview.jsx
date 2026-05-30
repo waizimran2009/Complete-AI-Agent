@@ -30,67 +30,103 @@ const TRANSCRIPT_LIVE = [
 ];
 
 function InterviewPage() {
+  const { isMobile, isTablet } = useBreakpoint();
+  const stackLayout = isMobile || isTablet;
   const [view, setView] = React.useState("list"); // list | live | terminated | results
   const [selected, setSelected] = React.useState(CANDIDATES[0]);
 
-  if (view === "live")       return <InterviewLive  candidate={selected} goTerminated={() => setView("terminated")} goResults={() => setView("results")} goBack={() => setView("list")} />;
-  if (view === "terminated") return <InterviewTerminated candidate={selected} goBack={() => setView("list")} />;
-  if (view === "results")    return <InterviewResults candidate={selected} goBack={() => setView("list")} />;
+  if (view === "live")       return <InterviewLive  candidate={selected} goTerminated={() => setView("terminated")} goResults={() => setView("results")} goBack={() => setView("list")} stackLayout={stackLayout} />;
+  if (view === "terminated") return <InterviewTerminated candidate={selected} goBack={() => setView("list")} isMobile={isMobile} />;
+  if (view === "results")    return <InterviewResults candidate={selected} goBack={() => setView("list")} stackLayout={stackLayout} />;
 
-  return <InterviewList onStart={(c) => { setSelected(c); setView("live"); }} onTerminated={(c) => { setSelected(c); setView("terminated"); }} onResults={(c) => { setSelected(c); setView("results"); }} />;
+  return <InterviewList onStart={(c) => { setSelected(c); setView("live"); }} onTerminated={(c) => { setSelected(c); setView("terminated"); }} onResults={(c) => { setSelected(c); setView("results"); }} stackLayout={stackLayout} isMobile={isMobile} />;
 }
 
 // ── List / ATS view ──────────────────────────
-function InterviewList({ onStart, onTerminated, onResults }) {
+function InterviewList({ onStart, onTerminated, onResults, stackLayout, isMobile }) {
   const [tab, setTab] = React.useState("all");
 
   return (
-    <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden" }}>
+    <div style={{ padding: isMobile ? 12 : 24, display: "grid", gridTemplateColumns: "1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden" }}>
       <div className="card card-glow" style={{ display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
         <div className="grid-bg" />
-        <div className="card-header" style={{ padding: "16px 20px", position: "relative", zIndex: 1 }}>
-          <div className="col gap-1">
-            <div className="row gap-3">
+        <div className="card-header" style={{ padding: "16px 20px", position: "relative", zIndex: 1, flexWrap: "wrap", gap: 10 }}>
+          <div className="col gap-1" style={{ flex: 1, minWidth: 0 }}>
+            <div className="row gap-3" style={{ flexWrap: "wrap" }}>
               <h3 className="h3">Senior Backend Engineer</h3>
               <span className="pill pill-accent">8 candidates</span>
-              <span className="pill pill-success"><IconCheck size={11} />ATS · Active</span>
+              {!isMobile && <span className="pill pill-success"><IconCheck size={11} />ATS · Active</span>}
             </div>
-            <div style={{ fontSize: 12, color: "var(--fg-3)" }}>
-              Karachi or remote · Rust/Go · 4+ years · Posted via the Posts page 3 days ago
-            </div>
+            {!isMobile && (
+              <div style={{ fontSize: 12, color: "var(--fg-3)" }}>
+                Karachi or remote · Rust/Go · 4+ years · Posted via the Posts page 3 days ago
+              </div>
+            )}
           </div>
-          <div className="row gap-2">
-            <button className="btn btn-sm"><IconFileText size={13} />Job spec</button>
-            <button className="btn btn-sm"><IconPaperclip size={13} />Upload CVs</button>
+          <div className="row gap-2" style={{ flexWrap: "wrap" }}>
+            {!isMobile && <button className="btn btn-sm"><IconFileText size={13} />Job spec</button>}
+            {!isMobile && <button className="btn btn-sm"><IconPaperclip size={13} />Upload CVs</button>}
             <button className="btn btn-primary btn-sm"><IconPlus size={13} />New interview</button>
           </div>
         </div>
 
         {/* Filter tabs + stats */}
-        <div className="row" style={{ padding: "14px 20px", borderBottom: "1px solid var(--hairline)", justifyContent: "space-between", position: "relative", zIndex: 1 }}>
-          <div className="tabs">
-            {[
+        <div style={{ padding: "10px 20px", borderBottom: "1px solid var(--hairline)", position: "relative", zIndex: 1, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
+          <div className="tabs" style={{ flexWrap: "wrap" }}>
+            {(isMobile ? [["all","All"],["active","Live"],["passed","Passed"],["dq","DQ"]] : [
               ["all", "All"],
               ["ranked", "Resume ranked"],
               ["pending", "Awaiting AI"],
               ["active", "Live now"],
               ["passed", "Passed"],
               ["dq", "Disqualified"],
-            ].map(([id, label]) => (
+            ]).map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)} className={`tab ${tab === id ? "active" : ""}`}>{label}</button>
             ))}
           </div>
-          <div className="row gap-4">
-            <Stat mini label="Resumes" value="142" />
-            <Stat mini label="AI ranked" value="38" />
-            <Stat mini label="Interviewed" value="9" />
-            <Stat mini label="Passed" value="4" accent="success" />
-            <Stat mini label="DQ" value="3" accent="danger" />
-          </div>
+          {!isMobile && (
+            <div className="row gap-4">
+              <Stat mini label="Resumes" value="142" />
+              <Stat mini label="AI ranked" value="38" />
+              <Stat mini label="Interviewed" value="9" />
+              <Stat mini label="Passed" value="4" accent="success" />
+              <Stat mini label="DQ" value="3" accent="danger" />
+            </div>
+          )}
         </div>
 
         {/* Table */}
-        <div style={{ flex: 1, overflowY: "auto", position: "relative", zIndex: 1 }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", position: "relative", zIndex: 1 }}>
+          {isMobile ? (
+            /* Mobile card list */
+            <div className="col">
+              {CANDIDATES.filter(c => tab === "all" ? true : c.status === tab).map(c => (
+                <div key={c.id} style={{ padding: "12px 16px", borderBottom: "1px solid var(--hairline)", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.05)", border: `1.5px solid ${c.color}`, color: c.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{c.initials}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 2, display: "flex", alignItems: "center", gap: 8 }}>
+                      {c.score !== null && <span style={{ fontWeight: 600, color: c.score >= 8 ? "rgb(var(--success))" : c.score >= 6 ? "rgb(var(--warning))" : "rgb(var(--danger))" }}>{c.score.toFixed(1)}/10</span>}
+                      {c.status === "active"   && <span className="pill pill-accent" style={{ height: 18, fontSize: 9.5 }}><span className="dot dot-accent" style={{ animation: "pulse-soft 1.4s infinite" }} />Live</span>}
+                      {c.status === "dq"       && <span className="pill pill-danger" style={{ height: 18, fontSize: 9.5 }}>DQ</span>}
+                      {c.status === "pending"  && <span className="pill pill-warning" style={{ height: 18, fontSize: 9.5 }}>Awaiting</span>}
+                      {c.status === "passed"   && <span className="pill pill-success" style={{ height: 18, fontSize: 9.5 }}>Passed</span>}
+                      {c.status === "ranked"   && <span className="pill" style={{ height: 18, fontSize: 9.5 }}>Ranked</span>}
+                    </div>
+                  </div>
+                  <div>
+                    {c.status === "active"   && <button className="btn btn-sm btn-primary" onClick={() => onStart(c)}>Join</button>}
+                    {c.status === "dq"       && <button className="btn btn-sm btn-ghost" onClick={() => onTerminated(c)}>View</button>}
+                    {c.status === "passed"   && <button className="btn btn-sm" onClick={() => onResults(c)}>Results</button>}
+                    {c.status === "pending"  && <button className="btn btn-sm" onClick={() => onStart(c)}>Start</button>}
+                    {(c.status === "ranked" || c.status === "rejected") && <button className="btn btn-sm btn-ghost">CV</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Desktop table */
+            <>
           <div style={{ display: "grid", gridTemplateColumns: "32px 1.4fr 0.9fr 0.7fr 1fr 100px", padding: "10px 20px", borderBottom: "1px solid var(--hairline)", fontSize: 10, fontWeight: 600, letterSpacing: "0.18em", color: "var(--fg-3)", textTransform: "uppercase" }}>
             <span></span>
             <span>Candidate</span>
@@ -163,6 +199,8 @@ function InterviewList({ onStart, onTerminated, onResults }) {
               </div>
             </div>
           ))}
+          </>
+          )}
         </div>
       </div>
     </div>
@@ -209,7 +247,7 @@ function ResumeFitBar({ score }) {
 }
 
 // ── Live interview view ──────────────────────
-function InterviewLive({ candidate, goTerminated, goResults, goBack }) {
+function InterviewLive({ candidate, goTerminated, goResults, goBack, stackLayout }) {
   const [elapsed, setElapsed] = React.useState(382); // 6m 22s
   const [warning, setWarning] = React.useState(false);
   const [questionIdx, setQuestionIdx] = React.useState(2);
@@ -239,7 +277,7 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack }) {
   }
 
   return (
-    <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden", position: "relative" }}>
+    <div style={{ padding: stackLayout ? 12 : 24, display: "grid", gridTemplateColumns: stackLayout ? "1fr" : "1.4fr 1fr", gap: 16, height: "calc(100vh - 64px)", overflow: stackLayout ? "auto" : "hidden", position: "relative" }}>
       {warning && (
         <div className="anim-fade-in" style={{
           position: "absolute", top: 0, left: 24, right: 24,
@@ -636,7 +674,7 @@ function InterviewTerminated({ candidate, goBack }) {
 }
 
 // ── Results screen ───────────────────────────
-function InterviewResults({ candidate, goBack }) {
+function InterviewResults({ candidate, goBack, stackLayout }) {
   return (
     <div style={{ padding: 24, height: "calc(100vh - 64px)", overflowY: "auto" }}>
       <div className="row" style={{ marginBottom: 18 }}>
@@ -684,7 +722,7 @@ function InterviewResults({ candidate, goBack }) {
             unknowns. <strong style={{ color: "var(--fg-1)" }}>Recommend advancing to final round with the engineering manager.</strong>
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
+          <div style={{ display: "grid", gridTemplateColumns: stackLayout ? "1fr" : "1fr 1fr", gap: 18, marginBottom: 22 }}>
             <div>
               <h3 className="h3" style={{ marginBottom: 10 }}>Strengths</h3>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--fg-2)", lineHeight: 1.7 }}>

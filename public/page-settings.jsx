@@ -27,6 +27,8 @@ const LANGUAGES = [
 ];
 
 function SettingsPage() {
+  const { isMobile, isTablet } = useBreakpoint();
+  const stackLayout = isMobile || isTablet;
   const [selectedModel, setSelectedModel] = React.useState("llama-3.1-70b");
   const [langs, setLangs] = React.useState(LANGUAGES);
   const [health, setHealth] = React.useState(null);
@@ -57,7 +59,7 @@ function SettingsPage() {
         </div>
 
         <div style={{ padding: 18, position: "relative", zIndex: 1 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: 12 }}>
             {MODELS.map(m => {
               const sel = selectedModel === m.id;
               return (
@@ -137,7 +139,7 @@ function SettingsPage() {
       </div>
 
       {/* Languages */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: stackLayout ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <div className="card">
           <div className="card-header">
             <div>
@@ -265,7 +267,7 @@ function SettingsPage() {
           <h3 className="h3">Integrations</h3>
           <button className="btn btn-sm">Browse all (24)</button>
         </div>
-        <div style={{ padding: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+        <div style={{ padding: 18, display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : isTablet ? "repeat(3, 1fr)" : "repeat(4, 1fr)", gap: 10 }}>
           {[
             { name: "Twilio",     desc: "Phone numbers + voice", connected: health?.features?.calls ?? true,  initial: "T" },
             { name: "SendGrid",   desc: "Outbound email",        connected: health?.features?.email ?? true,  initial: "S" },
