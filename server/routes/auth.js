@@ -36,21 +36,26 @@ router.post("/register", async (req, res) => {
   const row = { name: name.trim(), email: email.toLowerCase().trim(), password_hash, salt, role: "member" };
   if (company && company.trim()) row.company = company.trim();
 
-  const { data, error } = await sb
-    .from("users")
-    .insert(row)
-    .select("id, email, name, role")
-    .single();
+  try {
+    const { data, error } = await sb
+      .from("users")
+      .insert(row)
+      .select("id, email, name, role")
+      .single();
 
-  if (error) {
-    if (error.code === "23505")
-      return res.status(409).json({ error: "An account with this email already exists" });
-    console.error("Register error:", error.message);
-    return res.status(500).json({ error: "Registration failed — please try again" });
+    if (error) {
+      if (error.code === "23505")
+        return res.status(409).json({ error: "An account with this email already exists" });
+      console.error("Register error:", error.message);
+      return res.status(500).json({ error: "Registration failed — please try again" });
+    }
+
+    const token = signToken({ id: data.id, email: data.email, name: data.name, role: data.role });
+    res.json({ token, user: { id: data.id, email: data.email, name: data.name } });
+  } catch (err) {
+    console.error("Register exception:", err.message);
+    res.status(500).json({ error: "Registration failed — please try again" });
   }
-
-  const token = signToken({ id: data.id, email: data.email, name: data.name, role: data.role });
-  res.json({ token, user: { id: data.id, email: data.email, name: data.name } });
 });
 
 // POST /api/auth/login  (email+password OR legacy single-password)
@@ -63,24 +68,29 @@ router.post("/login", async (req, res) => {
     const sb = getSupabase();
     if (!sb) return res.status(503).json({ error: "Database not configured" });
 
-    const { data, error } = await sb
-      .from("users")
-      .select("id, email, name, password_hash, salt, role")
-      .eq("email", email.toLowerCase().trim())
-      .single();
+    try {
+      const { data, error } = await sb
+        .from("users")
+        .select("id, email, name, password_hash, salt, role")
+        .eq("email", email.toLowerCase().trim())
+        .single();
 
-    if (error || !data)
-      return res.status(401).json({ error: "Invalid email or password" });
+      if (error || !data)
+        return res.status(401).json({ error: "Invalid email or password" });
 
-    if (!data.password_hash)
-      return res.status(401).json({ error: "This account uses Google Sign-In. Please sign in with Google." });
+      if (!data.password_hash)
+        return res.status(401).json({ error: "This account uses Google Sign-In. Please sign in with Google." });
 
-    const computed = hashPassword(password, data.salt);
-    if (computed !== data.password_hash)
-      return res.status(401).json({ error: "Invalid email or password" });
+      const computed = hashPassword(password, data.salt);
+      if (computed !== data.password_hash)
+        return res.status(401).json({ error: "Invalid email or password" });
 
-    const token = signToken({ id: data.id, email: data.email, name: data.name, role: data.role });
-    return res.json({ token, user: { id: data.id, email: data.email, name: data.name } });
+      const token = signToken({ id: data.id, email: data.email, name: data.name, role: data.role });
+      return res.json({ token, user: { id: data.id, email: data.email, name: data.name } });
+    } catch (err) {
+      console.error("Login exception:", err.message);
+      return res.status(500).json({ error: "Sign in failed — please try again" });
+    }
   }
 
   // Legacy single-password mode
@@ -128,33 +138,38 @@ router.post("/google", async (req, res) => {
   const sb = getSupabase();
   if (!sb) return res.status(503).json({ error: "Database not configured" });
 
-  // Find existing user
-  const { data: existing } = await sb
-    .from("users")
-    .select("id, email, name, role")
-    .eq("email", email.toLowerCase())
-    .single();
+  try {
+    // Find existing user
+    const { data: existing } = await sb
+      .from("users")
+      .select("id, email, name, role")
+      .eq("email", email.toLowerCase())
+      .single();
 
-  if (existing) {
-    const token = signToken({ id: existing.id, email: existing.email, name: existing.name, role: existing.role });
-    return res.json({ token, user: { id: existing.id, email: existing.email, name: existing.name } });
+    if (existing) {
+      const token = signToken({ id: existing.id, email: existing.email, name: existing.name, role: existing.role });
+      return res.json({ token, user: { id: existing.id, email: existing.email, name: existing.name } });
+    }
+
+    // Create new Google user (no password)
+    const displayName = name || email.split("@")[0];
+    const { data: newUser, error: insertErr } = await sb
+      .from("users")
+      .insert({ name: displayName, email: email.toLowerCase(), google_id: googleId, role: "member" })
+      .select("id, email, name, role")
+      .single();
+
+    if (insertErr) {
+      console.error("Google user create error:", insertErr.message);
+      return res.status(500).json({ error: "Could not create account. Please try again." });
+    }
+
+    const token = signToken({ id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role });
+    res.json({ token, user: { id: newUser.id, email: newUser.email, name: newUser.name } });
+  } catch (err) {
+    console.error("Google auth exception:", err.message);
+    res.status(500).json({ error: "Google sign-in failed — please try again" });
   }
-
-  // Create new Google user (no password)
-  const displayName = name || email.split("@")[0];
-  const { data: newUser, error: insertErr } = await sb
-    .from("users")
-    .insert({ name: displayName, email: email.toLowerCase(), google_id: googleId, role: "member" })
-    .select("id, email, name, role")
-    .single();
-
-  if (insertErr) {
-    console.error("Google user create error:", insertErr.message);
-    return res.status(500).json({ error: "Could not create account. Please try again." });
-  }
-
-  const token = signToken({ id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role });
-  res.json({ token, user: { id: newUser.id, email: newUser.email, name: newUser.name } });
 });
 
 // GET /api/auth/check

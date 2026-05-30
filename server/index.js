@@ -5,7 +5,21 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
 
+// ── Keep the process alive: log errors instead of crashing ──────────────────
+// On Railway a single unhandled rejection (e.g. a failed Supabase/Twilio call)
+// would otherwise kill the whole server and trigger an endless restart loop.
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠ Unhandled promise rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("⚠ Uncaught exception:", err);
+});
+
 const app = express();
+
+// Railway / Render / any reverse proxy sits in front of us. Trust it so that
+// req.ip and express-rate-limit work correctly (and don't throw).
+app.set("trust proxy", 1);
 
 // Security headers (relaxed CSP for CDN scripts)
 app.use(helmet({
@@ -13,7 +27,13 @@ app.use(helmet({
 }));
 
 // Rate limiting on API
-app.use("/api", rateLimit({ windowMs: 60_000, max: 120 }));
+app.use("/api", rateLimit({
+  windowMs: 60_000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false, // don't throw on proxy header validation
+}));
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
