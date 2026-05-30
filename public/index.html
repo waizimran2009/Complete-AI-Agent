@@ -119,7 +119,7 @@
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
             <TopBar title={meta.title} subtitle={meta.sub} theme={theme} setTheme={setTheme} />
             <main key={navKey} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
-              <PageIntro kind={page} label={meta.title} sublabel={meta.sub} k={navKey} />
+              {page !== "chat" && <PageIntro kind={page} label={meta.title} sublabel={meta.sub} k={navKey} />}
               <div className={`ambient-${page}`} />
               <div className="page-reveal" style={{ position: "relative", zIndex: 1 }}>
                 {page === "chat"       && <ChatPage />}
