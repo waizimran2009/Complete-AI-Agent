@@ -3,6 +3,7 @@
    ─────────────────────────────────────────── */
 
 function AnalyticsPage() {
+  const { isMobile, isTablet } = useBreakpoint();
   const [stats, setStats] = React.useState(null);
   React.useEffect(() => {
     window.apiFetch('/api/analytics/overview')
@@ -11,20 +12,25 @@ function AnalyticsPage() {
       .catch(() => {});
   }, []);
 
+  const p = isMobile ? 14 : 24;
+  const kpiCols = isMobile ? "repeat(2, 1fr)" : isTablet ? "repeat(3, 1fr)" : "repeat(6, 1fr)";
+  const chartCols = (isMobile || isTablet) ? "1fr" : "1.4fr 1fr";
+  const lowerCols = isMobile ? "1fr" : "1fr 1fr";
+
   return (
-    <div style={{ padding: 24, overflowY: "auto", height: "calc(100vh - 64px)" }}>
+    <div style={{ padding: p, overflowY: "auto", height: "calc(100vh - 64px)" }}>
       {/* Top KPI strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: kpiCols, gap: isMobile ? 8 : 12, marginBottom: 16 }}>
         <StatCard label="Headcount" value={stats?.headcount?.toString() ?? "142"} sub="+6 this quarter" trend="up" icon={IconUsers} accent />
         <StatCard label="Open roles" value="9" sub="3 hot" icon={IconBriefcase} accent />
-        <StatCard label="Avg. attendance" value="94%" sub="+1.2 vs last mo" trend="up" icon={IconCheck} accent />
+        <StatCard label="Attendance" value="94%" sub="+1.2 vs last mo" trend="up" icon={IconCheck} accent />
         <StatCard label="Time-to-hire" value="18d" sub="-4d vs last Q" trend="up" icon={IconClock} accent />
         <StatCard label="Offer accept" value="78%" sub="-3% MoM" trend="down" icon={IconStar} accent />
         <StatCard label="Attrition" value="6.2%" sub="Annualized" icon={IconArrowDown} accent />
       </div>
 
       {/* 2-column charts */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: chartCols, gap: 16, marginBottom: 16 }}>
         <PipelineFunnel />
         <FeatureUsageRing />
       </div>
@@ -33,7 +39,7 @@ function AnalyticsPage() {
       <FeaturePerformanceTable />
 
       {/* Lower row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: lowerCols, gap: 16, marginTop: 16 }}>
         <DepartmentBreakdown />
         <AIDecisionsLog />
       </div>

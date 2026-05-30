@@ -454,6 +454,17 @@ function StatCard({ label, value, sub, trend, icon: I, accent }) {
   );
 }
 
+// ── Shared responsive hook ─────────────────────────────────────────────────
+function useBreakpoint() {
+  const [w, setW] = React.useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  React.useEffect(() => {
+    const fn = () => setW(window.innerWidth);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return { isMobile: w < 768, isTablet: w < 1060, w };
+}
+
 Object.assign(window, {
-  QuantumOrb, BrandMark, Sidebar, TopBar, StatCard, NAV_ITEMS, THEME_OPTIONS,
+  QuantumOrb, BrandMark, Sidebar, TopBar, StatCard, NAV_ITEMS, THEME_OPTIONS, useBreakpoint,
 });

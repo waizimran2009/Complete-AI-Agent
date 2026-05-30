@@ -12,8 +12,58 @@ function getSupabase() {
 router.get("/number", (req, res) => {
   res.json({
     number: process.env.TWILIO_PHONE_NUMBER || null,
-    configured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+    configured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
   });
+});
+
+// POST /api/calls/outbound — Aria calls the user's phone number
+router.post("/outbound", async (req, res) => {
+  const { to } = req.body;
+  if (!to) return res.status(400).json({ error: "Phone number is required" });
+
+  const sid  = process.env.TWILIO_ACCOUNT_SID;
+  const auth = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!sid || !auth || !from) {
+    return res.status(503).json({
+      error: "Twilio is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to your .env file.",
+    });
+  }
+
+  // Normalize to E.164 format
+  let phone = to.replace(/[\s\-().]/g, "");
+  if (!phone.startsWith("+")) {
+    if (phone.startsWith("0") && phone.length === 11) {
+      phone = "+92" + phone.slice(1); // Pakistani local number
+    } else if (phone.length === 10) {
+      phone = "+1" + phone; // US default
+    } else {
+      phone = "+" + phone;
+    }
+  }
+
+  if (!/^\+[1-9]\d{6,14}$/.test(phone)) {
+    return res.status(400).json({
+      error: "Invalid number. Use international format: +1 555 123 4567 or +92 300 1234567",
+    });
+  }
+
+  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+
+  try {
+    const twilio = require("twilio");
+    const client = twilio(sid, auth);
+    const call = await client.calls.create({
+      from,
+      to: phone,
+      url: `${baseUrl}/api/calls/webhook`,
+    });
+    res.json({ success: true, callSid: call.sid, message: `Aria is calling ${phone} — answer your phone!` });
+  } catch (err) {
+    console.error("Outbound call error:", err.message);
+    res.status(500).json({ error: err.message || "Call failed. Check your Twilio credentials." });
+  }
 });
 
 // POST /api/calls/webhook — Twilio calls this when a call comes in (TwiML)

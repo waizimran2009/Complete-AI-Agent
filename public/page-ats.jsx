@@ -95,8 +95,11 @@ function ATSPage() {
   const normalizedList = activeList.map(normalizeResume);
   const shown = normalizedList.filter(r => tab === "all" || r.status === tab);
 
+  const { isMobile, isTablet } = useBreakpoint();
+  const stackLayout = isMobile || isTablet;
+
   return (
-    <div style={{ padding: 24, display: "grid", gridTemplateColumns: "340px 1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden" }}>
+    <div style={{ padding: stackLayout ? 12 : 24, display: "grid", gridTemplateColumns: stackLayout ? "1fr" : "320px 1fr", gap: stackLayout ? 10 : 16, height: stackLayout ? "auto" : "calc(100vh - 64px)", overflowY: stackLayout ? "auto" : "hidden" }}>
       {/* Left column: JD + criteria */}
       <div className="col gap-4" style={{ overflowY: "auto" }}>
         <div className="card card-glow" style={{ position: "relative", overflow: "hidden" }}>

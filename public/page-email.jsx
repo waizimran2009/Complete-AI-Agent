@@ -22,9 +22,11 @@ const EMAIL_TEMPLATES = [
 ];
 
 function EmailPage() {
+  const { isMobile, isTablet } = useBreakpoint();
   const [selected, setSelected] = React.useState(INBOX_THREADS[0]);
   const [composeOpen, setComposeOpen] = React.useState(false);
-  const [tab, setTab] = React.useState("inbox"); // inbox | compose
+  const [showThread, setShowThread] = React.useState(false); // mobile: show thread detail
+  const [tab, setTab] = React.useState("inbox");
   const [sentLogs, setSentLogs] = React.useState([]);
 
   React.useEffect(() => {
@@ -34,20 +36,22 @@ function EmailPage() {
       .catch(() => {});
   }, []);
 
+  const stackLayout = isMobile || isTablet;
+
   return (
     <div style={{
-      padding: 24,
+      padding: stackLayout ? 12 : 24,
       display: "grid",
-      gridTemplateColumns: composeOpen ? "1fr" : "320px 1fr",
-      gap: 16,
-      height: "calc(100vh - 64px)",
-      overflow: "hidden",
+      gridTemplateColumns: composeOpen ? "1fr" : (stackLayout ? "1fr" : "300px 1fr"),
+      gap: stackLayout ? 10 : 16,
+      height: stackLayout ? "auto" : "calc(100vh - 64px)",
+      overflowY: stackLayout ? "auto" : "hidden",
     }}>
-      {!composeOpen && (
+      {!composeOpen && (!stackLayout || !showThread) && (
         <InboxList
           threads={INBOX_THREADS}
           selectedId={selected?.id}
-          onSelect={setSelected}
+          onSelect={(t) => { setSelected(t); if (stackLayout) setShowThread(true); }}
           onCompose={() => setComposeOpen(true)}
           sentLogs={sentLogs}
         />
@@ -56,9 +60,9 @@ function EmailPage() {
         <ComposeView onClose={() => setComposeOpen(false)} onSent={() => {
           window.apiFetch('/api/email/history').then(r => r.json()).then(d => setSentLogs(d.logs || [])).catch(() => {});
         }} />
-      ) : (
-        <ThreadDetail thread={selected} onCompose={() => setComposeOpen(true)} />
-      )}
+      ) : (!stackLayout || showThread) ? (
+        <ThreadDetail thread={selected} onCompose={() => setComposeOpen(true)} onBack={stackLayout ? () => setShowThread(false) : null} />
+      ) : null}
     </div>
   );
 }
@@ -187,22 +191,26 @@ const AI_DRAFTS = {
   },
 };
 
-function ThreadDetail({ thread, onCompose }) {
+function ThreadDetail({ thread, onCompose, onBack }) {
   if (!thread) return null;
   const draft = AI_DRAFTS[thread.id];
 
   return (
     <div className="card" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div className="card-header">
-        <div>
-          <h3 className="h3" style={{ marginBottom: 4 }}>{thread.subj}</h3>
-          <div className="row gap-3" style={{ fontSize: 11.5, color: "var(--fg-3)" }}>
-            <span>From <strong style={{ color: "var(--fg-2)" }}>{thread.name}</strong> ({thread.from})</span>
-            <span>·</span>
-            <span>{thread.time} ago</span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {onBack && (
+            <button className="btn btn-sm btn-ghost" onClick={onBack} style={{ marginBottom: 6 }}>
+              ← Back
+            </button>
+          )}
+          <h3 className="h3" style={{ marginBottom: 4 }} className="truncate">{thread.subj}</h3>
+          <div className="row gap-2" style={{ fontSize: 11.5, color: "var(--fg-3)", flexWrap: "wrap" }}>
+            <span>From <strong style={{ color: "var(--fg-2)" }}>{thread.name}</strong></span>
+            <span>· {thread.time} ago</span>
           </div>
         </div>
-        <div className="row gap-2">
+        <div className="row gap-2" style={{ flexShrink: 0 }}>
           <button className="btn btn-sm btn-ghost"><IconStar size={13} /></button>
           <button className="btn btn-sm btn-ghost"><IconCopy size={13} /></button>
           <button className="btn btn-sm">Forward</button>
@@ -271,6 +279,7 @@ function ThreadDetail({ thread, onCompose }) {
 
 // ── Compose view (live Claude generation) ────
 function ComposeView({ onClose, onSent }) {
+  const { isMobile, isTablet } = useBreakpoint();
   const [recipient, setRecipient] = React.useState("");
   const [purpose, setPurpose] = React.useState("");
   const [template, setTemplate] = React.useState("cold");
@@ -317,9 +326,12 @@ function ComposeView({ onClose, onSent }) {
       const sendData = await sendRes.json();
       if (sendData.error) {
         setError(`Send failed: ${sendData.error}`);
-      } else {
+      } else if (sendData.sent) {
         setSendSuccess(true);
         if (onSent) onSent();
+      } else {
+        // Not sent — credentials not configured
+        setError(sendData.note || "Email credentials not configured. Set EMAIL_USER and EMAIL_PASS in .env to send real emails. The draft was generated successfully.");
       }
     } catch (err) {
       setError(`Send failed: ${err.message}`);
@@ -338,7 +350,7 @@ function ComposeView({ onClose, onSent }) {
         <button className="btn btn-icon btn-sm btn-ghost" onClick={onClose}><IconClose size={14} /></button>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "grid", gridTemplateColumns: "360px 1fr", gap: 20, position: "relative", zIndex: 1 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? 14 : 20, display: "grid", gridTemplateColumns: (isMobile || isTablet) ? "1fr" : "340px 1fr", gap: isMobile ? 14 : 20, position: "relative", zIndex: 1 }}>
         {/* Left: controls */}
         <div className="col gap-4">
           <div>

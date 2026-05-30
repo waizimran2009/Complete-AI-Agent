@@ -71,8 +71,11 @@ function AttendancePage() {
     window.apiFetch('/api/attendance/today').then(r => r.json()).then(d => setTodayRecords(d.records || []));
   }
 
+  const { isMobile, isTablet } = useBreakpoint();
+  const stackLayout = isMobile || isTablet;
+
   return (
-    <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden" }}>
+    <div style={{ padding: stackLayout ? 12 : 24, display: "grid", gridTemplateColumns: stackLayout ? "1fr" : "1.3fr 1fr", gap: stackLayout ? 12 : 16, height: stackLayout ? "auto" : "calc(100vh - 64px)", overflowY: stackLayout ? "auto" : "hidden" }}>
       <div className="col gap-4" style={{ overflowY: "auto" }}>
         <CheckInCard
           checkingIn={checkingIn}
