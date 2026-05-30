@@ -500,11 +500,11 @@ function ChatPage() {
         {/* ── Chat view ── */}
         {chatOpen && (
           <div style={{ height: "100%", display: "flex", flexDirection: "column", paddingTop: 64, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "center", paddingTop: 16, paddingBottom: 8, flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: chatHistoryOpen ? "center" : "flex-start", paddingTop: 16, paddingBottom: 8, paddingLeft: chatHistoryOpen ? 0 : 32, flexShrink: 0 }}>
               <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={72} />
             </div>
 
-            <div className="pc-scroll" style={{ flex: 1, overflowY: "auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: 768, margin: "0 auto", boxSizing: "border-box" }}>
+            <div className="pc-scroll" style={{ flex: 1, overflowY: "auto", padding: chatHistoryOpen ? "16px 24px" : "16px 40px 16px 32px", display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: chatHistoryOpen ? 768 : "none", margin: chatHistoryOpen ? "0 auto" : "0", boxSizing: "border-box" }}>
               {messages.map(msg => (
                 <div key={msg.id} className="pc-msg-in" style={{ display: "flex", gap: 12, flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
                   {msg.role === "ai" && (
@@ -557,7 +557,7 @@ function ChatPage() {
               <div ref={bottomRef} />
             </div>
 
-            <div style={{ flexShrink: 0, padding: "0 24px 24px", maxWidth: 768, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+            <div style={{ flexShrink: 0, padding: chatHistoryOpen ? "0 24px 24px" : "0 40px 24px 32px", maxWidth: chatHistoryOpen ? 768 : "none", width: "100%", margin: chatHistoryOpen ? "0 auto" : "0", boxSizing: "border-box" }}>
               <InputCard
                 inputVal={inputVal}
                 setInputVal={setInputVal}
