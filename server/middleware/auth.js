@@ -1,5 +1,8 @@
 const jwt = require("jsonwebtoken");
 
+if (process.env.ACCESS_PASSWORD && !process.env.JWT_SECRET) {
+  console.warn("⚠️  WARNING: JWT_SECRET is not set. Using insecure fallback — set JWT_SECRET in Railway env vars.");
+}
 const SECRET = process.env.JWT_SECRET || "quantumania-dev-secret-change-in-prod";
 
 function signToken(payload) {

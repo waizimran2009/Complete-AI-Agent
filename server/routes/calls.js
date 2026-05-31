@@ -75,7 +75,7 @@ router.post("/webhook", (req, res) => {
     Hello! Thank you for calling ${company}. I am Aria, your AI assistant.
     Please briefly describe what you need help with, and I will assist you.
   </Say>
-  <Gather input="speech" action="/api/calls/respond" timeout="8" speechTimeout="2">
+  <Gather input="speech" action="/api/calls/respond" timeout="8" speechTimeout="4">
     <Say voice="Polly.Joanna">Go ahead, I am listening.</Say>
   </Gather>
   <Say voice="Polly.Joanna">I did not catch that. Please call back and try again.</Say>
@@ -101,7 +101,9 @@ router.post("/respond", async (req, res) => {
         `Respond naturally as a receptionist in 1-2 sentences. Be helpful and professional.`
       );
       reply = reply.trim();
-    } catch (_) {}
+    } catch (err) {
+      console.error("AI speech response error:", err.message);
+    }
 
     const sb = getSupabase();
     if (sb) {
@@ -117,7 +119,7 @@ router.post("/respond", async (req, res) => {
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna">${reply.replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c])}</Say>
-  <Gather input="speech" action="/api/calls/respond" timeout="8" speechTimeout="2">
+  <Gather input="speech" action="/api/calls/respond" timeout="8" speechTimeout="4">
     <Say voice="Polly.Joanna">Is there anything else I can help you with?</Say>
   </Gather>
   <Say voice="Polly.Joanna">Thank you for calling. Have a great day!</Say>

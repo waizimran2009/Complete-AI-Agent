@@ -274,7 +274,8 @@ function ChatPage() {
   // Session state
   const [sessions,         setSessions]          = React.useState([]);
   const [activeSessionId,  setActiveSessionId]   = React.useState(null);
-  const [chatHistoryOpen,  setChatHistoryOpen]   = React.useState(window.innerWidth >= 768);
+  const [chatHistoryOpen,  setChatHistoryOpen]   = React.useState(false);
+  const { isMobile } = useBreakpoint();
 
   const voiceOrbOpenRef    = React.useRef(false);
   const wakewordRecRef     = React.useRef(null);
@@ -350,6 +351,7 @@ function ChatPage() {
     setMessages(msgs.map((m, i) => ({ role: m.role, text: m.content, id: m.id || i })));
     setChatOpen(msgs.length > 0);
     setInputVal("");
+    if (isMobile) setChatHistoryOpen(false);
   }
 
   async function deleteSession(id) {
@@ -417,23 +419,39 @@ function ChatPage() {
     <div style={{ display: "flex", height: "100vh", width: "100%", color: "white", fontFamily: "var(--font-sans)", overflow: "hidden", background: THEME.bg }}>
       <style>{CHAT_STYLES}</style>
 
-      {/* ── Chat History Sidebar ── */}
-      <ChatHistorySidebar
-        sessions={sessions}
-        activeId={activeSessionId}
-        onLoad={loadSession}
-        onNew={newChat}
-        onDelete={deleteSession}
-        open={chatHistoryOpen}
-        onToggle={() => setChatHistoryOpen(o => !o)}
-      />
+      {/* Mobile backdrop for chat history */}
+      {isMobile && chatHistoryOpen && (
+        <div onClick={() => setChatHistoryOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 150 }} />
+      )}
+
+      {/* ── Chat History Sidebar — fixed overlay on mobile, flex panel on desktop ── */}
+      <div style={isMobile ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 200, display: chatHistoryOpen ? "flex" : "none" } : {}}>
+        <ChatHistorySidebar
+          sessions={sessions}
+          activeId={activeSessionId}
+          onLoad={loadSession}
+          onNew={newChat}
+          onDelete={deleteSession}
+          open={isMobile ? true : chatHistoryOpen}
+          onToggle={() => setChatHistoryOpen(o => !o)}
+        />
+      </div>
 
       {/* ── Main chat area ── */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <PremiumCanvas />
 
         {/* ── Top bar ── */}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "flex-start", padding: "16px 20px", zIndex: 20 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", zIndex: 20 }}>
+          {isMobile && !chatHistoryOpen && (
+            <button
+              onClick={() => setChatHistoryOpen(true)}
+              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.08)", color: "#a78bfa", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+            >
+              ▶
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
           {chatOpen && (
             <button
               onClick={newChat}
@@ -504,7 +522,7 @@ function ChatPage() {
               <OrbWrapper beatPulse={beatPulse} beatRef={beatRef} size={72} />
             </div>
 
-            <div className="pc-scroll" style={{ flex: 1, overflowY: "auto", padding: chatHistoryOpen ? "16px 24px" : "16px 40px 16px 32px", display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: chatHistoryOpen ? 768 : "none", margin: chatHistoryOpen ? "0 auto" : "0", boxSizing: "border-box" }}>
+            <div className="pc-scroll" style={{ flex: 1, overflowY: "auto", padding: isMobile ? "12px 14px" : (chatHistoryOpen ? "16px 24px" : "16px 40px 16px 32px"), display: "flex", flexDirection: "column", gap: 20, width: "100%", maxWidth: isMobile ? "none" : (chatHistoryOpen ? 768 : "none"), margin: (!isMobile && chatHistoryOpen) ? "0 auto" : "0", boxSizing: "border-box" }}>
               {messages.map(msg => (
                 <div key={msg.id} className="pc-msg-in" style={{ display: "flex", gap: 12, flexDirection: msg.role === "user" ? "row-reverse" : "row" }}>
                   {msg.role === "ai" && (
@@ -557,7 +575,7 @@ function ChatPage() {
               <div ref={bottomRef} />
             </div>
 
-            <div style={{ flexShrink: 0, padding: chatHistoryOpen ? "0 24px 24px" : "0 40px 24px 32px", maxWidth: chatHistoryOpen ? 768 : "none", width: "100%", margin: chatHistoryOpen ? "0 auto" : "0", boxSizing: "border-box" }}>
+            <div style={{ flexShrink: 0, padding: isMobile ? "0 12px 16px" : (chatHistoryOpen ? "0 24px 24px" : "0 40px 24px 32px"), maxWidth: isMobile ? "none" : (chatHistoryOpen ? 768 : "none"), width: "100%", margin: (!isMobile && chatHistoryOpen) ? "0 auto" : "0", boxSizing: "border-box" }}>
               <InputCard
                 inputVal={inputVal}
                 setInputVal={setInputVal}
