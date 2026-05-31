@@ -67,7 +67,18 @@
       const [page,         setPage]         = useState("chat");
       const [theme,        setTheme]        = useState("default");
       const [navKey,       setNavKey]       = useState(0);
-      const [sidebarOpen,  setSidebarOpen]  = useState(true);
+      const [isMobile,     setIsMobile]     = useState(window.innerWidth < 768);
+      const [sidebarOpen,  setSidebarOpen]  = useState(window.innerWidth >= 768);
+
+      useEffect(() => {
+        function onResize() {
+          const mobile = window.innerWidth < 768;
+          setIsMobile(mobile);
+          if (!mobile) setSidebarOpen(true);
+        }
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+      }, []);
 
       useEffect(() => {
         if (theme === "default") document.documentElement.removeAttribute("data-theme");
@@ -75,9 +86,10 @@
       }, [theme]);
 
       function navigate(p) {
-        if (p === page) return;
+        if (p === page) { if (isMobile) setSidebarOpen(false); return; }
         setPage(p);
         setNavKey(k => k + 1);
+        if (isMobile) setSidebarOpen(false);
       }
 
       const meta = PAGE_META[page] || { title: "", sub: "" };
@@ -94,14 +106,38 @@
 
       // Step 3: Main app
       return (
-        <div className="app-root" style={{ display: "flex", flexDirection: "row" }}>
-          {sidebarOpen && <Sidebar current={page} onNavigate={navigate} onToggle={() => setSidebarOpen(false)} />}
-          {!sidebarOpen && (
+        <div className="app-root" style={{ display: "flex", flexDirection: "row", overflow: "hidden", height: "100vh" }}>
+          {/* Mobile overlay backdrop */}
+          {isMobile && sidebarOpen && (
+            <div
+              onClick={() => setSidebarOpen(false)}
+              style={{
+                position: "fixed", inset: 0,
+                background: "rgba(0,0,0,0.55)",
+                zIndex: 150,
+              }}
+            />
+          )}
+
+          {/* Sidebar — fixed overlay on mobile, normal flow on desktop */}
+          {sidebarOpen && (
+            <div style={isMobile ? {
+              position: "fixed", top: 0, left: 0, bottom: 0,
+              zIndex: 200,
+              display: "flex",
+            } : { display: "flex" }}>
+              <Sidebar current={page} onNavigate={navigate} onToggle={() => setSidebarOpen(false)} />
+            </div>
+          )}
+
+          {/* Floating hamburger — only for chat page on mobile (no TopBar there) */}
+          {!sidebarOpen && (page === "chat" || (!isMobile && page !== "chat")) && (
             <button
               onClick={() => setSidebarOpen(true)}
               title="Show sidebar"
               style={{
-                position: "fixed", left: 12, top: "50%", transform: "translateY(-50%)",
+                position: "fixed", left: 12, top: "50%",
+                transform: "translateY(-50%)",
                 zIndex: 100,
                 width: 32, height: 32,
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -119,8 +155,9 @@
               <IconMenu size={15} />
             </button>
           )}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
-            {page !== "chat" && <TopBar title={meta.title} subtitle={meta.sub} theme={theme} setTheme={setTheme} />}
+
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", minWidth: 0 }}>
+            {page !== "chat" && <TopBar title={meta.title} subtitle={meta.sub} theme={theme} setTheme={setTheme} onMenuOpen={!sidebarOpen && isMobile ? () => setSidebarOpen(true) : undefined} />}
             <main key={navKey} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
               {page !== "chat" && <PageIntro kind={page} label={meta.title} sublabel={meta.sub} k={navKey} />}
               <div className={`ambient-${page}`} />

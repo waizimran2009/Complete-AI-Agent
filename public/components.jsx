@@ -338,7 +338,7 @@ const THEME_OPTIONS = [
   { id: "crimson",      label: "Crimson",        color: "rgb(244, 63, 94)" },
 ];
 
-function TopBar({ title, subtitle, theme, setTheme, rightSlot }) {
+function TopBar({ title, subtitle, theme, setTheme, rightSlot, onMenuOpen }) {
   const [themeOpen, setThemeOpen] = React.useState(false);
   return (
     <header style={{
@@ -350,11 +350,21 @@ function TopBar({ title, subtitle, theme, setTheme, rightSlot }) {
       WebkitBackdropFilter: "blur(16px)",
       display: "flex",
       alignItems: "center",
-      padding: "0 24px",
+      padding: "0 16px 0 24px",
       gap: 18,
       position: "relative",
       zIndex: 2,
     }}>
+      {onMenuOpen && (
+        <button
+          className="btn btn-icon btn-sm"
+          onClick={onMenuOpen}
+          title="Open navigation"
+          style={{ flexShrink: 0, marginRight: 4 }}
+        >
+          <IconMenu size={15} />
+        </button>
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="row gap-3" style={{ alignItems: "baseline" }}>
           <h1 className="h2" style={{ letterSpacing: "-0.01em" }}>{title}</h1>
