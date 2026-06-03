@@ -11,13 +11,18 @@ function getSupabase() {
 // POST /api/interviews/generate-questions
 router.post("/generate-questions", async (req, res) => {
   const { jobRole = "Software Engineer", jobDescription = "", numQuestions = 5 } = req.body;
+  const safeRole = String(jobRole).slice(0, 100);
+  const safeDesc = String(jobDescription).slice(0, 1500);
+  const safeNum  = Math.min(Math.max(parseInt(numQuestions) || 5, 1), 15);
 
   try {
-    const prompt = `Generate ${numQuestions} interview questions for: ${jobRole}.\n${jobDescription ? `Job context: ${jobDescription}\n` : ""}Include a mix: technical (systems design, coding), behavioral, and situational.\n\nReturn JSON array:\n[\n  { "num": 1, "text": "question", "topic": "Systems design", "type": "technical" },\n  ...\n]`;
+    const prompt = `Generate ${safeNum} interview questions for: ${safeRole}.\n${safeDesc ? `Job context: ${safeDesc}\n` : ""}Include a mix: technical (systems design, coding), behavioral, and situational.\n\nReturn JSON array:\n[\n  { "num": 1, "text": "question", "topic": "Systems design", "type": "technical" },\n  ...\n]`;
 
     let text = await aiComplete(prompt);
     text = text.trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
-    const questions = JSON.parse(text);
+    let questions;
+    try { questions = JSON.parse(text); }
+    catch (_) { throw new Error("AI returned invalid JSON. Please try again."); }
     res.json({ questions });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -34,7 +39,9 @@ router.post("/score-answer", async (req, res) => {
 
     let text = await aiComplete(prompt);
     text = text.trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
-    const scored = JSON.parse(text);
+    let scored;
+    try { scored = JSON.parse(text); }
+    catch (_) { throw new Error("AI returned invalid JSON. Please try again."); }
     res.json(scored);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -43,7 +43,12 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
 
     let text = await aiComplete(prompt);
     text = text.trim().replace(/```json\n?/g, "").replace(/```\n?/g, "");
-    const parsed = JSON.parse(text);
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (_) {
+      throw new Error("AI returned an invalid response. Please try again.");
+    }
 
     const sb = getSupabase();
     let id = null;
@@ -60,10 +65,10 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
       id = data?.id;
     }
 
-    fs.unlinkSync(req.file.path);
+    fs.promises.unlink(req.file.path).catch(() => {});
     res.json({ ...parsed, id, filename: req.file.originalname });
   } catch (err) {
-    try { fs.unlinkSync(req.file.path); } catch (_) {}
+    fs.promises.unlink(req.file.path).catch(() => {});
     res.status(500).json({ error: err.message });
   }
 });

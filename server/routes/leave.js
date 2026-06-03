@@ -41,7 +41,9 @@ router.post("/apply", async (req, res) => {
     const parsed = JSON.parse(text);
     aiRecommendation = parsed.recommendation;
     aiNote = parsed.note;
-  } catch (_) {}
+  } catch (err) {
+    console.warn("[Leave AI] Analysis failed:", err.message);
+  }
 
   const sb = getSupabase();
   if (!sb) {

@@ -2,7 +2,7 @@ const express = require("express");
 const router  = express.Router();
 const crypto  = require("crypto");
 const https   = require("https");
-const { signToken } = require("../middleware/auth");
+const { signToken, decodeToken } = require("../middleware/auth");
 const { createClient } = require("@supabase/supabase-js");
 
 function getSupabase() {
@@ -19,13 +19,17 @@ router.get("/config", (req, res) => {
   res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID || null });
 });
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /api/auth/register
 router.post("/register", async (req, res) => {
   const { name, email, password, company } = req.body;
   if (!name || !email || !password)
     return res.status(400).json({ error: "Name, email and password are required" });
-  if (password.length < 6)
-    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  if (!EMAIL_RE.test(email))
+    return res.status(400).json({ error: "Invalid email address" });
+  if (password.length < 8)
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
 
   const sb = getSupabase();
   if (!sb) return res.status(503).json({ error: "Database not configured — add SUPABASE_SERVICE_KEY" });
@@ -82,8 +86,11 @@ router.post("/login", async (req, res) => {
         return res.status(401).json({ error: "This account uses Google Sign-In. Please sign in with Google." });
 
       const computed = hashPassword(password, data.salt);
-      if (computed !== data.password_hash)
-        return res.status(401).json({ error: "Invalid email or password" });
+      const valid = crypto.timingSafeEqual(
+        Buffer.from(computed, "hex"),
+        Buffer.from(data.password_hash, "hex")
+      );
+      if (!valid) return res.status(401).json({ error: "Invalid email or password" });
 
       const token = signToken({ id: data.id, email: data.email, name: data.name, role: data.role });
       return res.json({ token, user: { id: data.id, email: data.email, name: data.name } });
@@ -108,17 +115,18 @@ router.post("/google", async (req, res) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) return res.status(503).json({ error: "Google Sign-In is not configured on this server" });
 
-  // Verify the token with Google
+  // Verify the token with Google (5-second timeout)
   let tokenInfo;
   try {
     tokenInfo = await new Promise((resolve, reject) => {
-      https.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`, (r) => {
+      const req = https.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`, (r) => {
         let body = "";
         r.on("data", (chunk) => { body += chunk; });
         r.on("end", () => {
-          try { resolve(JSON.parse(body)); } catch { reject(new Error("Invalid response")); }
+          try { resolve(JSON.parse(body)); } catch { reject(new Error("Invalid Google response")); }
         });
       }).on("error", reject);
+      setTimeout(() => { req.destroy(); reject(new Error("Google verification timed out")); }, 5000);
     });
   } catch (err) {
     console.error("Google token verify error:", err.message);
@@ -183,14 +191,9 @@ router.get("/check", (req, res) => {
 
   if (!token) return res.json({ authenticated: false });
 
-  try {
-    const { verify } = require("jsonwebtoken");
-    const SECRET = process.env.JWT_SECRET || "quantumania-dev-secret-change-in-prod";
-    const payload = verify(token, SECRET);
-    res.json({ authenticated: true, user: payload });
-  } catch {
-    res.json({ authenticated: false });
-  }
+  const payload = decodeToken(token);
+  if (!payload) return res.json({ authenticated: false });
+  res.json({ authenticated: true, user: payload });
 });
 
 module.exports = router;

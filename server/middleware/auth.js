@@ -26,4 +26,8 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { signToken, requireAuth };
+function decodeToken(token) {
+  try { return jwt.verify(token, SECRET); } catch { return null; }
+}
+
+module.exports = { signToken, requireAuth, decodeToken };

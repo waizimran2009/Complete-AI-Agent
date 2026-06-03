@@ -31,10 +31,13 @@ router.post("/draft", async (req, res) => {
   }
 });
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /api/email/send — AI writes and sends email
 router.post("/send", async (req, res) => {
   const { to, subject, brief, tone = "professional" } = req.body;
   if (!to || !subject || !brief) return res.status(400).json({ error: "to, subject, brief required" });
+  if (!EMAIL_RE.test(to)) return res.status(400).json({ error: "Invalid recipient email address" });
 
   let body;
   try {

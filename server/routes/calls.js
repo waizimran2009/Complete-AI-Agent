@@ -2,14 +2,36 @@ const express = require("express");
 const router = express.Router();
 const { createClient } = require("@supabase/supabase-js");
 const { aiComplete } = require("../lib/ai");
+const { requireAuth } = require("../middleware/auth");
 
 function getSupabase() {
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return null;
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 }
 
+// Verify that a request actually came from Twilio (prevents TwiML injection)
+function verifyTwilioSignature(req, res, next) {
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken) return next(); // skip if Twilio not configured
+  try {
+    const twilio = require("twilio");
+    const sig    = req.headers["x-twilio-signature"] || "";
+    const base   = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const url    = `${base}${req.originalUrl}`;
+    if (!twilio.validateRequest(authToken, sig, url, req.body || {})) {
+      return res.status(403).set("Content-Type", "text/xml")
+        .send(`<?xml version="1.0"?><Response></Response>`);
+    }
+    next();
+  } catch (err) {
+    console.error("[calls] Twilio signature check failed:", err.message);
+    res.status(403).set("Content-Type", "text/xml")
+      .send(`<?xml version="1.0"?><Response></Response>`);
+  }
+}
+
 // GET /api/calls/number — return configured Twilio number
-router.get("/number", (req, res) => {
+router.get("/number", requireAuth, (req, res) => {
   res.json({
     number: process.env.TWILIO_PHONE_NUMBER || null,
     configured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER),
@@ -17,7 +39,7 @@ router.get("/number", (req, res) => {
 });
 
 // POST /api/calls/outbound — Aria calls the user's phone number
-router.post("/outbound", async (req, res) => {
+router.post("/outbound", requireAuth, async (req, res) => {
   const { to } = req.body;
   if (!to) return res.status(400).json({ error: "Phone number is required" });
 
@@ -67,7 +89,7 @@ router.post("/outbound", async (req, res) => {
 });
 
 // POST /api/calls/webhook — Twilio calls this when a call comes in (TwiML)
-router.post("/webhook", (req, res) => {
+router.post("/webhook", verifyTwilioSignature, (req, res) => {
   const company = process.env.COMPANY_NAME || "our company";
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -85,7 +107,7 @@ router.post("/webhook", (req, res) => {
 });
 
 // POST /api/calls/respond — Twilio sends speech result, AI generates reply
-router.post("/respond", async (req, res) => {
+router.post("/respond", verifyTwilioSignature, async (req, res) => {
   const speech = req.body?.SpeechResult || "";
   const callSid = req.body?.CallSid || "";
   const company = process.env.COMPANY_NAME || "our company";
@@ -130,7 +152,7 @@ router.post("/respond", async (req, res) => {
 });
 
 // GET /api/calls/logs
-router.get("/logs", async (req, res) => {
+router.get("/logs", requireAuth, async (req, res) => {
   const sb = getSupabase();
   if (!sb) return res.json({ logs: [] });
   const { data, error } = await sb

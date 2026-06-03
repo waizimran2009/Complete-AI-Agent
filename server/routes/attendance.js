@@ -22,30 +22,35 @@ router.post("/checkin", async (req, res) => {
   }
 
   const today = new Date().toISOString().split("T")[0];
-  const { data: existing } = await sb
-    .from("attendance")
-    .select("id")
-    .eq("employee_id", employeeId)
-    .eq("date", today)
-    .single();
+  try {
+    const { data: existing } = await sb
+      .from("attendance")
+      .select("id")
+      .eq("employee_id", employeeId)
+      .eq("date", today)
+      .single();
 
-  if (existing) {
-    return res.status(409).json({ error: "Already checked in today" });
+    if (existing) {
+      return res.status(409).json({ error: "Already checked in today" });
+    }
+
+    const { data, error } = await sb.from("attendance").insert({
+      employee_id: employeeId,
+      employee_name: employeeName,
+      date: today,
+      check_in: new Date().toISOString(),
+      method,
+      location,
+      is_wfh: wfh,
+      status: "present",
+    }).select().single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ id: data.id, message: `Check-in recorded for ${employeeName}`, time: data.check_in });
+  } catch (err) {
+    console.error("[attendance] checkin error:", err.message);
+    res.status(500).json({ error: "Check-in failed — please try again" });
   }
-
-  const { data, error } = await sb.from("attendance").insert({
-    employee_id: employeeId,
-    employee_name: employeeName,
-    date: today,
-    check_in: new Date().toISOString(),
-    method,
-    location,
-    is_wfh: wfh,
-    status: "present",
-  }).select().single();
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ id: data.id, message: `Check-in recorded for ${employeeName}`, time: data.check_in });
 });
 
 // POST /api/attendance/checkout
@@ -59,25 +64,30 @@ router.post("/checkout", async (req, res) => {
   const today = new Date().toISOString().split("T")[0];
   const now = new Date().toISOString();
 
-  const { data: record } = await sb
-    .from("attendance")
-    .select("id, check_in")
-    .eq("employee_id", employeeId)
-    .eq("date", today)
-    .single();
+  try {
+    const { data: record } = await sb
+      .from("attendance")
+      .select("id, check_in")
+      .eq("employee_id", employeeId)
+      .eq("date", today)
+      .single();
 
-  if (!record) return res.status(404).json({ error: "No check-in found for today" });
+    if (!record) return res.status(404).json({ error: "No check-in found for today" });
 
-  const hoursWorked = record.check_in
-    ? ((new Date(now) - new Date(record.check_in)) / 3600000).toFixed(2)
-    : null;
+    const hoursWorked = record.check_in
+      ? ((new Date(now) - new Date(record.check_in)) / 3600000).toFixed(2)
+      : null;
 
-  const { error } = await sb.from("attendance")
-    .update({ check_out: now, hours_worked: hoursWorked })
-    .eq("id", record.id);
+    const { error } = await sb.from("attendance")
+      .update({ check_out: now, hours_worked: hoursWorked })
+      .eq("id", record.id);
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ updated: true, hours_worked: hoursWorked });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ updated: true, hours_worked: hoursWorked });
+  } catch (err) {
+    console.error("[attendance] checkout error:", err.message);
+    res.status(500).json({ error: "Check-out failed — please try again" });
+  }
 });
 
 // GET /api/attendance/report
@@ -89,6 +99,9 @@ router.get("/report", async (req, res) => {
   let query = sb.from("attendance").select("*").order("date", { ascending: false });
 
   if (month) {
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ error: "month must be YYYY-MM format" });
+    }
     const [year, m] = month.split("-");
     const start = `${year}-${m}-01`;
     const end = `${year}-${m}-31`;

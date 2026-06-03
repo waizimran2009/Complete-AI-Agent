@@ -20,10 +20,13 @@ router.get("/", async (req, res) => {
   res.json({ employees: data || [] });
 });
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /api/employees
 router.post("/", async (req, res) => {
   const { name, email, jobRole, department } = req.body;
   if (!name || !email) return res.status(400).json({ error: "name and email required" });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "Invalid email address" });
 
   const sb = getSupabase();
   if (!sb) return res.json({ id: "demo-" + Date.now(), name, email });

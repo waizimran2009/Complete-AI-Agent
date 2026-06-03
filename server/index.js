@@ -21,9 +21,21 @@ const app = express();
 // req.ip and express-rate-limit work correctly (and don't throw).
 app.set("trust proxy", 1);
 
-// Security headers (relaxed CSP for CDN scripts)
+// Security headers — CSP allows the CDN scripts and Babel JSX runtime
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:     ["'self'"],
+      scriptSrc:      ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://unpkg.com", "https://accounts.google.com"],
+      styleSrc:       ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc:        ["'self'", "https://fonts.gstatic.com"],
+      imgSrc:         ["'self'", "data:", "blob:", "https:"],
+      connectSrc:     ["'self'", "https://accounts.google.com", "https://oauth2.googleapis.com"],
+      frameSrc:       ["https://accounts.google.com"],
+      objectSrc:      ["'none'"],
+      baseUri:        ["'self'"],
+    },
+  },
 }));
 
 // Rate limiting on API
@@ -32,10 +44,20 @@ app.use("/api", rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: false, // don't throw on proxy header validation
+  validate: false,
 }));
 
-app.use(cors());
+// CORS — restrict to configured origin(s), or same-origin if not set
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",").map(s => s.trim())
+  : null;
+app.use(cors(allowedOrigins ? {
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(Object.assign(new Error("CORS: origin not allowed"), { status: 403 }));
+  },
+  credentials: true,
+} : {}));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -65,10 +87,12 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
-// Global error handler
+// Global error handler — never expose stack traces to clients
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Internal server error" });
+  const status = err.status || err.statusCode || 500;
+  console.error(`[${status}] ${req.method} ${req.path} —`, err.message);
+  if (status >= 500) console.error(err.stack);
+  res.status(status).json({ error: status < 500 ? err.message : "Internal server error" });
 });
 
 const PORT = process.env.PORT || 3000;

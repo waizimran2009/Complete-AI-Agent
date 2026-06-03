@@ -44,9 +44,12 @@ const MODEL_2 = "deepseek-r1-distill-llama-70b";   // Groq — DeepSeek R1 70B
 const MODEL_3 = "@cf/meta/llama-3.1-8b-instruct";  // Cloudflare — Llama 3.1 8B
 
 // ── Rate-limit / service-down detector ────────────────────────────────────
+// Hard client errors (4xx other than 429) are not retried — they won't fix
+// themselves by trying another provider.
 function isSoftError(err) {
   const status = err?.status || err?.statusCode;
-  const msg    = (err?.message || "").toLowerCase();
+  if (status && status < 500 && status !== 429) return false;
+  const msg = (err?.message || "").toLowerCase();
   return (
     status === 429 ||
     status === 503 ||
