@@ -25,14 +25,22 @@ router.post("/complete", async (req, res) => {
   const { prompt, history } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt required" });
 
+  const timer = setTimeout(() => {
+    if (!res.headersSent) res.status(503).json({ error: "AI is busy — please try again in a moment." });
+  }, 28000);
+
   try {
     const text = history?.length
       ? await aiChat(prompt, history, null)
       : await aiComplete(prompt);
-    res.json({ text });
+    if (!res.headersSent) {
+      clearTimeout(timer);
+      res.json({ text });
+    }
   } catch (err) {
+    clearTimeout(timer);
     console.error("AI complete error:", err.message);
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 });
 
@@ -41,12 +49,21 @@ router.post("/chat", async (req, res) => {
   const { message, history } = req.body;
   if (!message) return res.status(400).json({ error: "message required" });
 
+  // 28-second server-side hard cap — always responds before browser's 30s abort
+  const timer = setTimeout(() => {
+    if (!res.headersSent) res.status(503).json({ error: "AI is busy — please try again in a moment." });
+  }, 28000);
+
   try {
     const text = await aiChat(message, history || [], ARIA_SYSTEM);
-    res.json({ text });
+    if (!res.headersSent) {
+      clearTimeout(timer);
+      res.json({ text });
+    }
   } catch (err) {
+    clearTimeout(timer);
     console.error("AI chat error:", err.message);
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 });
 

@@ -45,16 +45,32 @@ window.apiFetch = async function(url, opts = {}) {
 
 // ── Aria chat (POST /api/ai/chat) ─────────────────────
 window.ariaChat = async function(message, history) {
-  const res = await window.apiFetch("/api/ai/chat", {
-    method: "POST",
-    body: JSON.stringify({ message, history }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Chat request failed");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000); // 30s hard limit
+
+  try {
+    const token = window.__auth.getToken();
+    const res = await fetch("/api/ai/chat", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ message, history }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Chat request failed");
+    }
+    const data = await res.json();
+    return data.text || "";
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("Request timed out — please try again.");
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  const data = await res.json();
-  return data.text || "";
 };
 
 // ── Chat session persistence ──────────────────────────
