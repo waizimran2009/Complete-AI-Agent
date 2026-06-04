@@ -1,60 +1,62 @@
 /**
- * AI helper — 3-model cascade fallback
+ * AI helper — 4-model cascade fallback
  *
  * Priority order:
- *   1. Groq  — Llama 3.3 70B         (fast + smart, 14,400 req/day free)
- *   2. Groq  — DeepSeek R1 70B       (reasoning model, separate quota, 14,400/day)
- *   3. Cloudflare — Llama 3.1 8B     (100% free, no daily cap, different provider)
+ *   1. Gemini — gemini-2.0-flash        (primary, fast + generous free tier)
+ *   2. Groq   — Llama 3.3 70B           (fallback, 14,400 req/day free)
+ *   3. Groq   — DeepSeek R1 70B         (fallback, separate quota)
+ *   4. Cloudflare — Llama 3.1 8B        (last resort, no daily cap)
  *
- * If a model returns 429 (rate limit) or 503 (service down), the next one
- * is tried automatically — transparent to the user.
- *
- * Rate limit resets:
- *   Per-minute → every 60 seconds
- *   Per-day    → midnight UTC  (5:00 AM Pakistan time)
- *   Cloudflare → no daily cap (10,000 "neurons"/day, effectively unlimited)
+ * If a model returns 429 (rate limit) or times out, the next one is tried.
  *
  * Env vars required:
- *   GROQ_API_KEY          — from console.groq.com (covers models 1 & 2)
- *   CLOUDFLARE_ACCOUNT_ID — from dash.cloudflare.com (right sidebar)
- *   CLOUDFLARE_API_TOKEN  — Workers AI token from dash.cloudflare.com/profile/api-tokens
+ *   GEMINI_API_KEY        — from aistudio.google.com (primary AI)
+ *   GROQ_API_KEY          — from console.groq.com (fallback)
+ *   CLOUDFLARE_ACCOUNT_ID — from dash.cloudflare.com (last resort)
+ *   CLOUDFLARE_API_TOKEN  — Workers AI token
  */
 
 const { OpenAI } = require("openai");
 
-// ── Groq client (models 1 & 2 — same key, separate quotas) ────────────────
+// ── Gemini client (model 1 — primary) ─────────────────────────────────────
+const gemini = process.env.GEMINI_API_KEY
+  ? new OpenAI({
+      apiKey:     process.env.GEMINI_API_KEY,
+      baseURL:    "https://generativelanguage.googleapis.com/v1beta/openai/",
+      maxRetries: 0,
+    })
+  : null;
+
+// ── Groq client (models 2 & 3 — same key, separate quotas) ────────────────
 const groq = process.env.GROQ_API_KEY
   ? new OpenAI({
       apiKey:     process.env.GROQ_API_KEY,
       baseURL:    "https://api.groq.com/openai/v1",
-      timeout:    15000,  // 15 s — fall through to next model if Groq hangs
-      maxRetries: 0,      // we manage retries ourselves via the cascade
+      maxRetries: 0,
     })
   : null;
 
-// ── Cloudflare Workers AI client (model 3) ─────────────────────────────────
+// ── Cloudflare Workers AI client (model 4 — last resort) ──────────────────
 const cfClient = (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN)
   ? new OpenAI({
       apiKey:     process.env.CLOUDFLARE_API_TOKEN,
       baseURL:    `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
-      timeout:    20000,  // 20 s — Cloudflare can be slightly slower
       maxRetries: 0,
     })
   : null;
 
 // ── Model identifiers ──────────────────────────────────────────────────────
-const MODEL_1 = "llama-3.3-70b-versatile";         // Groq — Llama 3.3 70B
-const MODEL_2 = "deepseek-r1-distill-llama-70b";   // Groq — DeepSeek R1 70B
-const MODEL_3 = "@cf/meta/llama-3.1-8b-instruct";  // Cloudflare — Llama 3.1 8B
+const MODEL_GEMINI = "gemini-2.0-flash";               // Google Gemini 2.0 Flash
+const MODEL_1      = "llama-3.3-70b-versatile";        // Groq — Llama 3.3 70B
+const MODEL_2      = "deepseek-r1-distill-llama-70b";  // Groq — DeepSeek R1 70B
+const MODEL_3      = "@cf/meta/llama-3.1-8b-instruct"; // Cloudflare — Llama 3.1 8B
 
 // ── Rate-limit / service-down detector ────────────────────────────────────
-// Hard client errors (4xx other than 429) are not retried — they won't fix
-// themselves by trying another provider.
 function isSoftError(err) {
   const status = err?.status || err?.statusCode;
   if (status && status < 500 && status !== 429) return false;
-  const msg = (err?.message || "").toLowerCase();
-  const name  = (err?.name  || "").toLowerCase();
+  const msg  = (err?.message || "").toLowerCase();
+  const name = (err?.name    || "").toLowerCase();
   return (
     status === 429 ||
     status === 503 ||
@@ -76,10 +78,8 @@ function isSoftError(err) {
   );
 }
 
-// ── Shared chat call (OpenAI-compatible) ───────────────────────────────────
-// Promise.race is used because the OpenAI SDK timeout option is unreliable
-// in some Node.js environments — an explicit timer is guaranteed to fire.
-const MODEL_TIMEOUT_MS = 7000; // 7 s per model → 3 providers = 21 s max cascade
+// ── Shared chat call — Promise.race guarantees the timeout always fires ────
+const MODEL_TIMEOUT_MS = 7000; // 7 s per model → 4 providers = 28 s max cascade
 
 async function callModel(client, model, messages) {
   const timer = new Promise((_, reject) =>
@@ -113,60 +113,58 @@ function buildMessages(prompt, history, system) {
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
-/**
- * Single prompt — cascade through all 3 models.
- * @param {string} prompt
- * @returns {Promise<string>}
- */
 async function aiComplete(prompt) {
   return aiChat(prompt, [], null);
 }
 
-/**
- * Multi-turn chat — cascade through all 3 models.
- * @param {string} message
- * @param {Array}  history  [{role, content}]
- * @param {string} [system] system instruction
- * @returns {Promise<string>}
- */
 async function aiChat(message, history, system) {
   if (!message) throw new Error("message is required");
 
   const msgs = buildMessages(message, history, system);
 
-  // 1️⃣  Groq — Llama 3.3 70B
-  if (groq) {
+  // 1️⃣  Gemini 2.0 Flash (primary)
+  if (gemini) {
     try {
-      const text = await callModel(groq, MODEL_1, msgs);
-      return text;
+      return await callModel(gemini, MODEL_GEMINI, msgs);
     } catch (err) {
       if (isSoftError(err)) {
-        console.warn(`[AI] Llama 3.3 70B → ${err.status || err.message} — trying DeepSeek R1`);
+        console.warn(`[AI] Gemini → ${err.status || err.message} — trying Groq`);
       } else {
         throw err;
       }
     }
   }
 
-  // 2️⃣  Groq — DeepSeek R1 70B  (separate daily quota)
+  // 2️⃣  Groq — Llama 3.3 70B
   if (groq) {
     try {
-      const text = await callModel(groq, MODEL_2, msgs);
-      return text;
+      return await callModel(groq, MODEL_1, msgs);
     } catch (err) {
       if (isSoftError(err)) {
-        console.warn(`[AI] DeepSeek R1 → ${err.status || err.message} — trying Cloudflare`);
+        console.warn(`[AI] Llama 3.3 → ${err.status || err.message} — trying DeepSeek`);
       } else {
         throw err;
       }
     }
   }
 
-  // 3️⃣  Cloudflare Workers AI — Llama 3.1 8B  (no daily cap)
+  // 3️⃣  Groq — DeepSeek R1 70B
+  if (groq) {
+    try {
+      return await callModel(groq, MODEL_2, msgs);
+    } catch (err) {
+      if (isSoftError(err)) {
+        console.warn(`[AI] DeepSeek → ${err.status || err.message} — trying Cloudflare`);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  // 4️⃣  Cloudflare Workers AI — Llama 3.1 8B
   if (cfClient) {
     try {
-      const text = await callModel(cfClient, MODEL_3, msgs);
-      return text;
+      return await callModel(cfClient, MODEL_3, msgs);
     } catch (err) {
       if (isSoftError(err)) {
         console.warn(`[AI] Cloudflare → ${err.status || err.message} — all providers exhausted`);
@@ -177,7 +175,7 @@ async function aiChat(message, history, system) {
   }
 
   throw new Error(
-    "All AI providers timed out. Groq may be rate-limited — limits reset at 5:00 AM PKT. Please try again in a moment."
+    "All AI providers timed out. Please try again in a moment."
   );
 }
 
