@@ -67,7 +67,7 @@ function isSoftError(err) {
 }
 
 // ── Shared chat call — Promise.race guarantees the timeout always fires ────
-const MODEL_TIMEOUT_MS = 7000; // 7 s per model → 3 providers = 21 s max
+const MODEL_TIMEOUT_MS = 5000; // 5 s per model → 3 providers = 15 s max
 
 async function callModel(client, model, messages) {
   const timer = new Promise((_, reject) =>
@@ -110,29 +110,27 @@ async function aiChat(message, history, system) {
 
   const msgs = buildMessages(message, history, system);
 
+  // Track whether Groq itself is broken (auth/forbidden) so we skip MODEL_2
+  // immediately instead of wasting another 5 s on the same bad key.
+  let groqBroken = false;
+
   // 1️⃣  Groq — Llama 3.3 70B
   if (groq) {
     try {
       return await callModel(groq, MODEL_1, msgs);
     } catch (err) {
-      if (isSoftError(err)) {
-        console.warn(`[AI] Llama 3.3 → ${err.status || err.message} — trying DeepSeek`);
-      } else {
-        throw err;
-      }
+      const s = err?.status || err?.statusCode;
+      groqBroken = (s === 401 || s === 403 || s === 400);
+      console.warn(`[AI] Llama 3.3 → ${s || err.message} — trying next`);
     }
   }
 
-  // 2️⃣  Groq — DeepSeek R1 70B
-  if (groq) {
+  // 2️⃣  Groq — DeepSeek R1 70B (skip if Groq auth is broken)
+  if (groq && !groqBroken) {
     try {
       return await callModel(groq, MODEL_2, msgs);
     } catch (err) {
-      if (isSoftError(err)) {
-        console.warn(`[AI] DeepSeek → ${err.status || err.message} — trying Cloudflare`);
-      } else {
-        throw err;
-      }
+      console.warn(`[AI] DeepSeek → ${err?.status || err.message} — trying Cloudflare`);
     }
   }
 
@@ -141,11 +139,7 @@ async function aiChat(message, history, system) {
     try {
       return await callModel(cfClient, MODEL_3, msgs);
     } catch (err) {
-      if (isSoftError(err)) {
-        console.warn(`[AI] Cloudflare → ${err.status || err.message} — all providers exhausted`);
-      } else {
-        throw err;
-      }
+      console.warn(`[AI] Cloudflare → ${err?.status || err.message} — all providers exhausted`);
     }
   }
 
