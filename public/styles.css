@@ -61,11 +61,26 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent iOS callout on long-press */
+  -webkit-tap-highlight-color: transparent;
 }
 
-#root, .app-root { height: 100vh; width: 100vw; overflow: hidden; }
+/* Use dynamic viewport height on mobile so app fits below browser chrome */
+#root, .app-root {
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+}
 
-button { font-family: inherit; cursor: pointer; }
+/* Prevent iOS from zooming inputs (requires font-size ≥ 16px on focus) */
+@media (max-width: 767px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 
 /* ── Type system ───────────────────────────── */
 .label {

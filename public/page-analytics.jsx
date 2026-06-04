@@ -18,7 +18,7 @@ function AnalyticsPage() {
   const lowerCols = isMobile ? "1fr" : "1fr 1fr";
 
   return (
-    <div style={{ padding: p, overflowY: "auto", height: "calc(100vh - 64px)" }}>
+    <div style={{ padding: p, overflowY: "auto", height: isMobile ? "auto" : "calc(100vh - 64px)" }}>
       {/* Top KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: kpiCols, gap: isMobile ? 8 : 12, marginBottom: 16 }}>
         <StatCard label="Headcount" value={stats?.headcount?.toString() ?? "142"} sub="+6 this quarter" trend="up" icon={IconUsers} accent />

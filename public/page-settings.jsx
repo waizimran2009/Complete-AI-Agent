@@ -45,7 +45,7 @@ function SettingsPage() {
   }
 
   return (
-    <div style={{ padding: 24, overflowY: "auto", height: "calc(100vh - 64px)" }}>
+    <div style={{ padding: stackLayout ? 14 : 24, overflowY: "auto", height: stackLayout ? "auto" : "calc(100vh - 64px)" }}>
       {/* Model selection */}
       <div className="card card-glow" style={{ marginBottom: 16, position: "relative", overflow: "hidden" }}>
         <div className="grid-bg" />

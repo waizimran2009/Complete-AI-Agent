@@ -676,7 +676,7 @@ function InterviewTerminated({ candidate, goBack }) {
 // ── Results screen ───────────────────────────
 function InterviewResults({ candidate, goBack, stackLayout }) {
   return (
-    <div style={{ padding: 24, height: "calc(100vh - 64px)", overflowY: "auto" }}>
+    <div style={{ padding: stackLayout ? 14 : 24, height: stackLayout ? "auto" : "calc(100vh - 64px)", overflowY: "auto" }}>
       <div className="row" style={{ marginBottom: 18 }}>
         <button className="btn btn-sm btn-ghost" onClick={goBack}>← Back</button>
       </div>

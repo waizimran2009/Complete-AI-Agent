@@ -19,13 +19,7 @@ window.apiFetch = async function(url, opts = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(opts.headers || {}),
   };
-  const res = await fetch(url, { ...opts, headers });
-  if (res.status === 401) {
-    window.__auth.clearToken();
-    window.location.reload(); // Force re-login
-    return;
-  }
-  return res;
+  return fetch(url, { ...opts, headers });
 };
 
 // ── Aria chat (POST /api/ai/chat) ─────────────────────
