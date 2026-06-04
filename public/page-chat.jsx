@@ -284,8 +284,8 @@ function ChatPage() {
 
   React.useEffect(() => { voiceOrbOpenRef.current = voiceOrbOpen; }, [voiceOrbOpen]);
 
-  // Safety net: force-clear typing indicator after 25 s — catches any case
-  // where the fetch hangs and the finally block never runs.
+  // Safety net: force-clear typing indicator after 30 s — last-resort fallback
+  // in case the server never responds and fetch never rejects.
   React.useEffect(() => {
     if (!isTyping) return;
     const id = setTimeout(() => {
@@ -293,9 +293,9 @@ function ChatPage() {
       setMessages(prev => {
         const last = prev[prev.length - 1];
         if (last && last.role === "ai") return prev;
-        return [...prev, { role: "ai", text: "Response timed out. Please try again.", id: Date.now() }];
+        return [...prev, { role: "ai", text: "No response from AI. Please try again.", id: Date.now() }];
       });
-    }, 25000);
+    }, 30000);
     return () => clearTimeout(id);
   }, [isTyping]);
 

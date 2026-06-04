@@ -79,7 +79,7 @@ function isSoftError(err) {
 // ── Shared chat call (OpenAI-compatible) ───────────────────────────────────
 // Promise.race is used because the OpenAI SDK timeout option is unreliable
 // in some Node.js environments — an explicit timer is guaranteed to fire.
-const MODEL_TIMEOUT_MS = 10000; // 10 s per model attempt
+const MODEL_TIMEOUT_MS = 7000; // 7 s per model → 3 providers = 21 s max cascade
 
 async function callModel(client, model, messages) {
   const timer = new Promise((_, reject) =>
@@ -177,8 +177,7 @@ async function aiChat(message, history, system) {
   }
 
   throw new Error(
-    "All AI providers are currently unavailable. " +
-    "Groq limits reset every minute and at 5:00 AM PKT. Please try again shortly."
+    "All AI providers timed out. Groq may be rate-limited — limits reset at 5:00 AM PKT. Please try again in a moment."
   );
 }
 
