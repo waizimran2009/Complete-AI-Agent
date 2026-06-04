@@ -67,11 +67,12 @@ function isSoftError(err) {
 }
 
 // ── Shared chat call — Promise.race guarantees the timeout always fires ────
-const MODEL_TIMEOUT_MS = 5000; // 5 s per model → 3 providers = 15 s max
+const GROQ_TIMEOUT_MS = 5000;   // Groq is fast — 5 s is plenty
+const CF_TIMEOUT_MS   = 12000;  // Cloudflare cold-starts can take 8-10 s
 
-async function callModel(client, model, messages) {
+async function callModel(client, model, messages, timeoutMs) {
   const timer = new Promise((_, reject) =>
-    setTimeout(() => reject(Object.assign(new Error("Model timeout"), { code: "ETIMEDOUT" })), MODEL_TIMEOUT_MS)
+    setTimeout(() => reject(Object.assign(new Error("Model timeout"), { code: "ETIMEDOUT" })), timeoutMs)
   );
   const call = client.chat.completions.create({
     model,
@@ -117,7 +118,7 @@ async function aiChat(message, history, system) {
   // 1️⃣  Groq — Llama 3.3 70B
   if (groq) {
     try {
-      return await callModel(groq, MODEL_1, msgs);
+      return await callModel(groq, MODEL_1, msgs, GROQ_TIMEOUT_MS);
     } catch (err) {
       const s = err?.status || err?.statusCode;
       groqBroken = (s === 401 || s === 403 || s === 400);
@@ -128,16 +129,16 @@ async function aiChat(message, history, system) {
   // 2️⃣  Groq — DeepSeek R1 70B (skip if Groq auth is broken)
   if (groq && !groqBroken) {
     try {
-      return await callModel(groq, MODEL_2, msgs);
+      return await callModel(groq, MODEL_2, msgs, GROQ_TIMEOUT_MS);
     } catch (err) {
       console.warn(`[AI] DeepSeek → ${err?.status || err.message} — trying Cloudflare`);
     }
   }
 
-  // 3️⃣  Cloudflare Workers AI — Llama 3.1 8B
+  // 3️⃣  Cloudflare Workers AI — Llama 3.1 8B (longer timeout for cold starts)
   if (cfClient) {
     try {
-      return await callModel(cfClient, MODEL_3, msgs);
+      return await callModel(cfClient, MODEL_3, msgs, CF_TIMEOUT_MS);
     } catch (err) {
       console.warn(`[AI] Cloudflare → ${err?.status || err.message} — all providers exhausted`);
     }
