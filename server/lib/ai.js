@@ -77,13 +77,21 @@ function isSoftError(err) {
 }
 
 // ── Shared chat call (OpenAI-compatible) ───────────────────────────────────
+// Promise.race is used because the OpenAI SDK timeout option is unreliable
+// in some Node.js environments — an explicit timer is guaranteed to fire.
+const MODEL_TIMEOUT_MS = 10000; // 10 s per model attempt
+
 async function callModel(client, model, messages) {
-  const res = await client.chat.completions.create({
+  const timer = new Promise((_, reject) =>
+    setTimeout(() => reject(Object.assign(new Error("Model timeout"), { code: "ETIMEDOUT" })), MODEL_TIMEOUT_MS)
+  );
+  const call = client.chat.completions.create({
     model,
     messages,
     max_tokens: 1024,
     temperature: 0.7,
   });
+  const res = await Promise.race([call, timer]);
   const content = res.choices?.[0]?.message?.content;
   if (!content) throw Object.assign(new Error("Empty response from model"), { status: 503 });
   return content;

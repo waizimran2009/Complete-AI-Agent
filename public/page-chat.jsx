@@ -284,6 +284,21 @@ function ChatPage() {
 
   React.useEffect(() => { voiceOrbOpenRef.current = voiceOrbOpen; }, [voiceOrbOpen]);
 
+  // Safety net: force-clear typing indicator after 25 s — catches any case
+  // where the fetch hangs and the finally block never runs.
+  React.useEffect(() => {
+    if (!isTyping) return;
+    const id = setTimeout(() => {
+      setIsTyping(false);
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.role === "ai") return prev;
+        return [...prev, { role: "ai", text: "Response timed out. Please try again.", id: Date.now() }];
+      });
+    }, 25000);
+    return () => clearTimeout(id);
+  }, [isTyping]);
+
   // Load chat sessions on mount
   React.useEffect(() => {
     window.chatSessions?.list().then(s => setSessions(s)).catch(() => {});
