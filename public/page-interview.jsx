@@ -47,7 +47,7 @@ function InterviewList({ onStart, onTerminated, onResults, stackLayout, isMobile
   const [tab, setTab] = React.useState("all");
 
   return (
-    <div style={{ padding: isMobile ? 12 : 24, display: "grid", gridTemplateColumns: "1fr", gap: 16, height: "calc(100vh - 64px)", overflow: "hidden" }}>
+    <div style={{ padding: isMobile ? 12 : 24, display: "grid", gridTemplateColumns: "1fr", gap: 16, height: isMobile ? "auto" : "calc(100vh - 64px)", overflow: isMobile ? "visible" : "hidden" }}>
       <div className="card card-glow" style={{ display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
         <div className="grid-bg" />
         <div className="card-header" style={{ padding: "16px 20px", position: "relative", zIndex: 1, flexWrap: "wrap", gap: 10 }}>

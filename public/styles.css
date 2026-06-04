@@ -343,3 +343,32 @@ button { font-family: inherit; cursor: pointer; touch-action: manipulation; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clickable { cursor: pointer; transition: opacity 0.15s ease; }
 .clickable:hover { opacity: 0.75; }
+
+/* ── Mobile global fixes ───────────────────── */
+@media (max-width: 767px) {
+  /* card headers wrap on small screens */
+  .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  /* tab strips scroll horizontally instead of overflowing */
+  .tabs {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* scrollable containers get momentum scrolling */
+  .col, main {
+    -webkit-overflow-scrolling: touch;
+  }
+  /* prevent wide content from causing page-wide overflow */
+  .card {
+    min-width: 0;
+    overflow: hidden;
+  }
+  /* make pre/code wrap on mobile */
+  pre, code {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}

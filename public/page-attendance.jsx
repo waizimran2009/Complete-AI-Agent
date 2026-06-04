@@ -99,6 +99,8 @@ function AttendancePage() {
 function CheckInCard({ checkingIn, checkedIn, checkInMsg, handleCheckIn, handleCheckOut }) {
   const [phase, setPhase] = React.useState("idle"); // idle, scanning, success
   const [progress, setProgress] = React.useState(0);
+  const { isMobile } = useBreakpoint();
+  const camSize = isMobile ? 160 : 220;
 
   function startCheckIn() {
     setPhase("scanning");
@@ -119,11 +121,11 @@ function CheckInCard({ checkingIn, checkedIn, checkInMsg, handleCheckIn, handleC
   return (
     <div className="card card-glow" style={{ position: "relative", overflow: "hidden" }}>
       <div className="grid-bg" />
-      <div style={{ padding: 20, display: "flex", gap: 24, position: "relative", zIndex: 1 }}>
+      <div style={{ padding: isMobile ? 14 : 20, display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 16 : 24, position: "relative", zIndex: 1, alignItems: isMobile ? "center" : "flex-start" }}>
         {/* Webcam frame */}
         <div style={{
-          width: 220,
-          height: 220,
+          width: camSize,
+          height: camSize,
           borderRadius: "var(--r-lg)",
           background: "linear-gradient(180deg, #18121a 0%, #0a0a14 100%)",
           border: "1.5px solid",
@@ -257,6 +259,7 @@ function CheckInCard({ checkingIn, checkedIn, checkInMsg, handleCheckIn, handleC
 }
 
 function PresenceTable({ todayRecords }) {
+  const { isMobile } = useBreakpoint();
   const activeCount = todayRecords != null
     ? todayRecords.length
     : PRESENCE_NOW.filter(p => p.mode !== "absent" && p.mode !== "leave").length;
@@ -322,10 +325,10 @@ function PresenceTable({ todayRecords }) {
           return (
             <div key={i} style={{
               display: "grid",
-              gridTemplateColumns: "32px 1.3fr 1.1fr 0.8fr 100px",
-              gap: 12,
+              gridTemplateColumns: isMobile ? "32px 1fr auto" : "32px 1.3fr 1.1fr 0.8fr 100px",
+              gap: isMobile ? 8 : 12,
               alignItems: "center",
-              padding: "11px 18px",
+              padding: isMobile ? "10px 14px" : "11px 18px",
               borderTop: i > 0 ? "1px solid var(--hairline)" : "none",
             }}>
               <div style={{
@@ -343,17 +346,17 @@ function PresenceTable({ todayRecords }) {
               }}>{getInitials(p)}</div>
               <div className="col" style={{ minWidth: 0 }}>
                 <span className="truncate" style={{ fontSize: 12.5, fontWeight: 500 }}>{getName(p)}</span>
-                <span className="truncate" style={{ fontSize: 11, color: "var(--fg-3)" }}>{getRole(p)}</span>
+                <span className="truncate" style={{ fontSize: 11, color: "var(--fg-3)" }}>{isMobile ? getLoc(p) : getRole(p)}</span>
               </div>
-              <span className="truncate" style={{ fontSize: 12, color: "var(--fg-2)" }}>{getLoc(p)}</span>
-              <span style={{ fontSize: 11.5, color: "var(--fg-3)" }} className="num">
+              {!isMobile && <span className="truncate" style={{ fontSize: 12, color: "var(--fg-2)" }}>{getLoc(p)}</span>}
+              {!isMobile && <span style={{ fontSize: 11.5, color: "var(--fg-3)" }} className="num">
                 {mode === "absent" ? <span style={{ color: "rgb(var(--danger))" }}>{getSince(p)}</span> : `Since ${getSince(p)}`}
-              </span>
+              </span>}
               <div style={{ textAlign: "right" }}>
-                {mode === "office" && <span className="pill pill-success" style={{ height: 22 }}>In office</span>}
-                {mode === "wfh"    && <span className="pill pill-accent"  style={{ height: 22 }}>WFH</span>}
-                {mode === "leave"  && <span className="pill pill-warning" style={{ height: 22 }}>Leave</span>}
-                {mode === "absent" && <span className="pill pill-danger"  style={{ height: 22 }}>Absent</span>}
+                {mode === "office" && <span className="pill pill-success" style={{ height: 22, fontSize: 10 }}>Office</span>}
+                {mode === "wfh"    && <span className="pill pill-accent"  style={{ height: 22, fontSize: 10 }}>WFH</span>}
+                {mode === "leave"  && <span className="pill pill-warning" style={{ height: 22, fontSize: 10 }}>Leave</span>}
+                {mode === "absent" && <span className="pill pill-danger"  style={{ height: 22, fontSize: 10 }}>Absent</span>}
               </div>
             </div>
           );

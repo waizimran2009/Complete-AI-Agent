@@ -25,16 +25,20 @@ const { OpenAI } = require("openai");
 // ── Groq client (models 1 & 2 — same key, separate quotas) ────────────────
 const groq = process.env.GROQ_API_KEY
   ? new OpenAI({
-      apiKey:  process.env.GROQ_API_KEY,
-      baseURL: "https://api.groq.com/openai/v1",
+      apiKey:     process.env.GROQ_API_KEY,
+      baseURL:    "https://api.groq.com/openai/v1",
+      timeout:    15000,  // 15 s — fall through to next model if Groq hangs
+      maxRetries: 0,      // we manage retries ourselves via the cascade
     })
   : null;
 
 // ── Cloudflare Workers AI client (model 3) ─────────────────────────────────
 const cfClient = (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN)
   ? new OpenAI({
-      apiKey:  process.env.CLOUDFLARE_API_TOKEN,
-      baseURL: `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
+      apiKey:     process.env.CLOUDFLARE_API_TOKEN,
+      baseURL:    `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
+      timeout:    20000,  // 20 s — Cloudflare can be slightly slower
+      maxRetries: 0,
     })
   : null;
 
@@ -50,6 +54,7 @@ function isSoftError(err) {
   const status = err?.status || err?.statusCode;
   if (status && status < 500 && status !== 429) return false;
   const msg = (err?.message || "").toLowerCase();
+  const name  = (err?.name  || "").toLowerCase();
   return (
     status === 429 ||
     status === 503 ||
@@ -58,7 +63,16 @@ function isSoftError(err) {
     msg.includes("quota") ||
     msg.includes("overloaded") ||
     msg.includes("unavailable") ||
-    msg.includes("try again")
+    msg.includes("try again") ||
+    msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("econnreset") ||
+    msg.includes("econnrefused") ||
+    msg.includes("enotfound") ||
+    msg.includes("network") ||
+    name.includes("timeout") ||
+    err?.code === "ETIMEDOUT" ||
+    err?.code === "ECONNRESET"
   );
 }
 
@@ -70,7 +84,9 @@ async function callModel(client, model, messages) {
     max_tokens: 1024,
     temperature: 0.7,
   });
-  return res.choices[0].message.content;
+  const content = res.choices?.[0]?.message?.content;
+  if (!content) throw Object.assign(new Error("Empty response from model"), { status: 503 });
+  return content;
 }
 
 // ── Build message array ────────────────────────────────────────────────────
