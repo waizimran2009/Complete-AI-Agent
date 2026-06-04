@@ -185,8 +185,9 @@ function FeaturePerformanceTable() {
           <span className="pill pill-warning">1 degraded</span>
         </div>
       </div>
-      <div>
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <div style={{
+          minWidth: 560,
           display: "grid",
           gridTemplateColumns: "1.5fr 1fr 0.8fr 0.8fr 0.9fr 1.4fr",
           padding: "10px 20px",
@@ -206,6 +207,7 @@ function FeaturePerformanceTable() {
         </div>
         {rows.map((r, i) => (
           <div key={i} style={{
+            minWidth: 560,
             display: "grid",
             gridTemplateColumns: "1.5fr 1fr 0.8fr 0.8fr 0.9fr 1.4fr",
             padding: "12px 20px",

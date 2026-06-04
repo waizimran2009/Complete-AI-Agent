@@ -1,33 +1,22 @@
 /**
- * AI helper — 4-model cascade fallback
+ * AI helper — 3-model cascade fallback
  *
  * Priority order:
- *   1. Gemini — gemini-2.0-flash        (primary, fast + generous free tier)
- *   2. Groq   — Llama 3.3 70B           (fallback, 14,400 req/day free)
- *   3. Groq   — DeepSeek R1 70B         (fallback, separate quota)
- *   4. Cloudflare — Llama 3.1 8B        (last resort, no daily cap)
+ *   1. Groq  — Llama 3.3 70B         (fast + smart, 14,400 req/day free)
+ *   2. Groq  — DeepSeek R1 70B       (reasoning model, separate quota)
+ *   3. Cloudflare — Llama 3.1 8B     (100% free, no daily cap)
  *
- * If a model returns 429 (rate limit) or times out, the next one is tried.
+ * If a model returns 429 / times out, the next one is tried automatically.
  *
  * Env vars required:
- *   GEMINI_API_KEY        — from aistudio.google.com (primary AI)
- *   GROQ_API_KEY          — from console.groq.com (fallback)
- *   CLOUDFLARE_ACCOUNT_ID — from dash.cloudflare.com (last resort)
+ *   GROQ_API_KEY          — from console.groq.com
+ *   CLOUDFLARE_ACCOUNT_ID — from dash.cloudflare.com (right sidebar)
  *   CLOUDFLARE_API_TOKEN  — Workers AI token
  */
 
 const { OpenAI } = require("openai");
 
-// ── Gemini client (model 1 — primary) ─────────────────────────────────────
-const gemini = process.env.GEMINI_API_KEY
-  ? new OpenAI({
-      apiKey:     process.env.GEMINI_API_KEY,
-      baseURL:    "https://generativelanguage.googleapis.com/v1beta/openai/",
-      maxRetries: 0,
-    })
-  : null;
-
-// ── Groq client (models 2 & 3 — same key, separate quotas) ────────────────
+// ── Groq client (models 1 & 2) ─────────────────────────────────────────────
 const groq = process.env.GROQ_API_KEY
   ? new OpenAI({
       apiKey:     process.env.GROQ_API_KEY,
@@ -36,7 +25,7 @@ const groq = process.env.GROQ_API_KEY
     })
   : null;
 
-// ── Cloudflare Workers AI client (model 4 — last resort) ──────────────────
+// ── Cloudflare Workers AI client (model 3) ─────────────────────────────────
 const cfClient = (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN)
   ? new OpenAI({
       apiKey:     process.env.CLOUDFLARE_API_TOKEN,
@@ -46,10 +35,9 @@ const cfClient = (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_AP
   : null;
 
 // ── Model identifiers ──────────────────────────────────────────────────────
-const MODEL_GEMINI = "gemini-2.0-flash";               // Google Gemini 2.0 Flash
-const MODEL_1      = "llama-3.3-70b-versatile";        // Groq — Llama 3.3 70B
-const MODEL_2      = "deepseek-r1-distill-llama-70b";  // Groq — DeepSeek R1 70B
-const MODEL_3      = "@cf/meta/llama-3.1-8b-instruct"; // Cloudflare — Llama 3.1 8B
+const MODEL_1 = "llama-3.3-70b-versatile";         // Groq — Llama 3.3 70B
+const MODEL_2 = "deepseek-r1-distill-llama-70b";   // Groq — DeepSeek R1 70B
+const MODEL_3 = "@cf/meta/llama-3.1-8b-instruct";  // Cloudflare — Llama 3.1 8B
 
 // ── Rate-limit / service-down detector ────────────────────────────────────
 function isSoftError(err) {
@@ -79,7 +67,7 @@ function isSoftError(err) {
 }
 
 // ── Shared chat call — Promise.race guarantees the timeout always fires ────
-const MODEL_TIMEOUT_MS = 7000; // 7 s per model → 4 providers = 28 s max cascade
+const MODEL_TIMEOUT_MS = 7000; // 7 s per model → 3 providers = 21 s max
 
 async function callModel(client, model, messages) {
   const timer = new Promise((_, reject) =>
@@ -122,20 +110,7 @@ async function aiChat(message, history, system) {
 
   const msgs = buildMessages(message, history, system);
 
-  // 1️⃣  Gemini 2.0 Flash (primary)
-  if (gemini) {
-    try {
-      return await callModel(gemini, MODEL_GEMINI, msgs);
-    } catch (err) {
-      if (isSoftError(err)) {
-        console.warn(`[AI] Gemini → ${err.status || err.message} — trying Groq`);
-      } else {
-        throw err;
-      }
-    }
-  }
-
-  // 2️⃣  Groq — Llama 3.3 70B
+  // 1️⃣  Groq — Llama 3.3 70B
   if (groq) {
     try {
       return await callModel(groq, MODEL_1, msgs);
@@ -148,7 +123,7 @@ async function aiChat(message, history, system) {
     }
   }
 
-  // 3️⃣  Groq — DeepSeek R1 70B
+  // 2️⃣  Groq — DeepSeek R1 70B
   if (groq) {
     try {
       return await callModel(groq, MODEL_2, msgs);
@@ -161,7 +136,7 @@ async function aiChat(message, history, system) {
     }
   }
 
-  // 4️⃣  Cloudflare Workers AI — Llama 3.1 8B
+  // 3️⃣  Cloudflare Workers AI — Llama 3.1 8B
   if (cfClient) {
     try {
       return await callModel(cfClient, MODEL_3, msgs);
@@ -175,7 +150,7 @@ async function aiChat(message, history, system) {
   }
 
   throw new Error(
-    "All AI providers timed out. Please try again in a moment."
+    "All AI providers are currently unavailable. Groq limits reset at 5:00 AM PKT. Please try again shortly."
   );
 }
 

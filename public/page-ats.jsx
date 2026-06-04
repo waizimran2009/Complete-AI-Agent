@@ -213,7 +213,9 @@ function ATSPage() {
           </div>
         )}
 
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <div style={{
+          minWidth: 520,
           display: "grid",
           gridTemplateColumns: "60px 1.6fr 0.7fr 1.2fr 0.8fr 100px",
           padding: "10px 20px",
@@ -239,6 +241,7 @@ function ATSPage() {
           )}
           {shown.map((r, i) => (
             <div key={r.id} className="anim-slide-up" style={{
+              minWidth: 520,
               display: "grid",
               gridTemplateColumns: "60px 1.6fr 0.7fr 1.2fr 0.8fr 100px",
               padding: "14px 20px",
@@ -301,6 +304,7 @@ function ATSPage() {
             </div>
           ))}
         </div>
+        </div>{/* /overflowX scroll wrapper */}
       </div>
     </div>
   );

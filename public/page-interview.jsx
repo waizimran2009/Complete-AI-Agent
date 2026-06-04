@@ -343,7 +343,7 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack, stackLayout
           flex: 1,
           padding: 20,
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: stackLayout ? "1fr" : "1fr 1fr",
           gap: 14,
           position: "relative",
           zIndex: 1,
@@ -355,7 +355,7 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack, stackLayout
             border: "1px solid var(--hairline-2)",
             position: "relative",
             overflow: "hidden",
-            minHeight: 280,
+            minHeight: stackLayout ? 180 : 280,
           }}>
             <div style={{
               position: "absolute", inset: 0,
@@ -419,7 +419,7 @@ function InterviewLive({ candidate, goTerminated, goResults, goBack, stackLayout
             border: "1px solid var(--hairline-2)",
             position: "relative",
             overflow: "hidden",
-            minHeight: 280,
+            minHeight: stackLayout ? 180 : 280,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -600,7 +600,7 @@ function InterviewTerminated({ candidate, goBack }) {
         pointerEvents: "none",
       }} />
       <div style={{
-        width: 560,
+        maxWidth: "min(560px, 94vw)", width: "100%",
         background: "linear-gradient(180deg, rgba(var(--danger), 0.06), rgba(255,255,255,0.01))",
         border: "1px solid rgba(var(--danger), 0.45)",
         borderRadius: "var(--r-xl)",
