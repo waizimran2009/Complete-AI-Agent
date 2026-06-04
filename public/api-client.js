@@ -11,6 +11,27 @@ window.__auth = {
   isLoggedIn()      { return !!localStorage.getItem(TOKEN_KEY); },
 };
 
+// ── Auto-login on startup ─────────────────────────────
+// When there's no token stored, call /api/auth/login with no body.
+// If the server has no ACCESS_PASSWORD set (open mode), it returns a
+// free admin token — so every feature works without a login screen.
+// If ACCESS_PASSWORD IS set on the server, this fails silently and the
+// user must remove that env var from Railway for the app to work.
+(async function autoLogin() {
+  if (window.__auth.getToken()) return;
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.token) window.__auth.setToken(data.token);
+    }
+  } catch {}
+})();
+
 // ── Authenticated fetch ───────────────────────────────
 window.apiFetch = async function(url, opts = {}) {
   const token = window.__auth.getToken();

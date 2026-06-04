@@ -105,7 +105,7 @@ app.listen(PORT, () => {
     "Email":      !!process.env.EMAIL_USER,
     "Calls":      !!process.env.TWILIO_ACCOUNT_SID,
     "DALL-E":     !!process.env.OPENAI_API_KEY,
-    "Auth":       !!process.env.ACCESS_PASSWORD,
+    "Auth":       process.env.REQUIRE_AUTH === "true",
   };
   Object.entries(features).forEach(([k, v]) =>
     console.log(`  ${v ? "✓" : "○"} ${k}`)

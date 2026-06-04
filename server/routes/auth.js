@@ -100,10 +100,12 @@ router.post("/login", async (req, res) => {
     }
   }
 
-  // Legacy single-password mode
+  // Open mode — auth is disabled, return free token
+  if (process.env.REQUIRE_AUTH !== "true") {
+    return res.json({ token: signToken({ role: "admin" }), mode: "open" });
+  }
   const expected = process.env.ACCESS_PASSWORD;
-  if (!expected) return res.json({ token: signToken({ role: "admin" }), mode: "open" });
-  if (password !== expected) return res.status(401).json({ error: "Wrong password" });
+  if (!expected || password !== expected) return res.status(401).json({ error: "Wrong password" });
   return res.json({ token: signToken({ role: "admin" }) });
 });
 
@@ -185,7 +187,7 @@ router.get("/check", (req, res) => {
   const header = req.headers.authorization || "";
   const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
 
-  if (!process.env.ACCESS_PASSWORD && !getSupabase()) {
+  if (process.env.REQUIRE_AUTH !== "true") {
     return res.json({ authenticated: true, mode: "open" });
   }
 

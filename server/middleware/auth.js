@@ -1,17 +1,20 @@
 const jwt = require("jsonwebtoken");
 
-if (process.env.ACCESS_PASSWORD && !process.env.JWT_SECRET) {
-  console.warn("⚠️  WARNING: JWT_SECRET is not set. Using insecure fallback — set JWT_SECRET in Railway env vars.");
+if (!process.env.JWT_SECRET) {
+  console.warn("⚠️  JWT_SECRET is not set — using insecure fallback. Set JWT_SECRET in Railway env vars.");
 }
 const SECRET = process.env.JWT_SECRET || "quantumania-dev-secret-change-in-prod";
+
+// Auth is enabled only when REQUIRE_AUTH=true is set in environment.
+// Set REQUIRE_AUTH=true on Railway when you are ready to add login back.
+const AUTH_ENABLED = process.env.REQUIRE_AUTH === "true";
 
 function signToken(payload) {
   return jwt.sign(payload, SECRET, { expiresIn: "7d" });
 }
 
 function requireAuth(req, res, next) {
-  // Skip auth if ACCESS_PASSWORD not set (open mode)
-  if (!process.env.ACCESS_PASSWORD) return next();
+  if (!AUTH_ENABLED) return next();
 
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : req.cookies?.token;
